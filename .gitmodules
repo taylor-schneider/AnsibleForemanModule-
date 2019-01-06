@@ -1,0 +1,3 @@
+[submodule "ForemanApiWrapper"]
+	path = ForemanApiWrapper
+	url = http://10.4.9.1/tschneider/ForemanApiWrapper.git
