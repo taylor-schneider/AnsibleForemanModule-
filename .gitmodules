@@ -1,3 +1,6 @@
 [submodule "ForemanApiWrapper"]
 	path = ForemanApiWrapper
 	url = http://10.4.9.1/tschneider/ForemanApiWrapper.git
+[submodule "Tests/AnsibleModuleTester"]
+	path = Tests/AnsibleModuleTester
+	url = http://10.4.9.1/tschneider/AnsibleModuleTester.git
