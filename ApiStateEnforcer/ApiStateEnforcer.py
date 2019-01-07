@@ -1,4 +1,4 @@
-from ApiStateEnforcerException import ApiStateEnforcerException
+from ApiStateEnforcer.ApiStateEnforcerException import ApiStateEnforcerException
 
 class ApiStateEnforcer():
 
