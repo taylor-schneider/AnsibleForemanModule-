@@ -70,9 +70,32 @@ class ApiStateEnforcer():
 
             minimalStateExists = self.Compare(minimalState, actualState)
 
-            if not minimalState:
+            if not minimalStateExists:
                 raise ApiStateEnforcerException(self.SetCompareFailedErrorMessage, minimalState, actualState)
+
+            return actualState
+
         except Exception as e:
             raise Exception("An error occurred while setting state.") from e
+
+    def Delete(self, deleteUrl, httpMethod, httpMethodParameters,  minimalState):
+
+        # It looks like a delete is simply setting some value to nothing
+        # Once deleted, a record for the deleted element will be returned
+        # This slightly changes things from the Set() function of this class
+        # Here, our delete function will accept parameters and then enforce a minimal state
+
+        try:
+            actualState = self.apiWrapper.MakeApiCall(deleteUrl, httpMethod, httpMethodParameters, None)
+
+            minimalStateExists = self.Compare(minimalState, actualState)
+
+            if not minimalStateExists:
+                raise ApiStateEnforcerException(self.SetCompareFailedErrorMessage, minimalState, actualState)
+
+            return actualState
+
+        except Exception as e:
+            raise Exception("An error occurred while deleting state.") from e
 
 

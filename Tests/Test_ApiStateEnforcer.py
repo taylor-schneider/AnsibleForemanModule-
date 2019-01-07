@@ -57,4 +57,24 @@ class Test_ApiStateEnforcer(TestCase):
         self.assertIsNotNone(actualState)
         self.assertEqual(type(actualState), dict)
 
+    def test_Delete_DeleteRecord_Success(self):
 
+        apiWrapper = ForemanApiWrapper(self.username, self.password, self.url, self.verifySsl)
+        apiStateEnforcer = ApiStateEnforcer(apiWrapper)
+
+        environmentName = "some_environment"
+
+        endpoint = "/api/environments/{0}".format(environmentName)
+        method = "delete"
+        httpMethodArguments =  {
+            "environment": {}
+        }
+
+        minimalState = {
+            "name": environmentName,
+        }
+
+        actualState = apiStateEnforcer.Delete(endpoint, method, httpMethodArguments, minimalState)
+
+        self.assertIsNotNone(actualState)
+        self.assertEqual(type(actualState), dict)
