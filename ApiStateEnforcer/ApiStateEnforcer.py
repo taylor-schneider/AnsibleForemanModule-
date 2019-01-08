@@ -1,4 +1,5 @@
-from ApiStateEnforcer.ApiStateEnforcerException import ApiStateEnforcerException
+from ApiStateEnforcer.StateComparisonException import StateComparisonException
+from ApiStateEnforcer.DeletedRecordMismatchException import DeletedRecordMismatchException
 
 class ApiStateEnforcer():
 
@@ -6,6 +7,7 @@ class ApiStateEnforcer():
         self.apiWrapper = apiWrapper
 
     SetCompareFailedErrorMessage = "The record returned from the set operation did not represent the specified minimal state."
+    DeletedRecordMismatch = "The deleted record's 'name' and 'id' fields did not match those supplied in the api url."
 
     def Check(self, checkUrl, httpMethod):
 
@@ -71,29 +73,42 @@ class ApiStateEnforcer():
             minimalStateExists = self.Compare(minimalState, actualState)
 
             if not minimalStateExists:
-                raise ApiStateEnforcerException(self.SetCompareFailedErrorMessage, minimalState, actualState)
+                raise StateComparisonException(self.SetCompareFailedErrorMessage, minimalState, actualState)
 
             return actualState
 
         except Exception as e:
             raise Exception("An error occurred while setting state.") from e
 
-    def Delete(self, deleteUrl, httpMethod, httpMethodParameters,  minimalState):
+    @staticmethod
+    def _confirmDeletedRecord(deleteUrl, deletedRecord):
+        specifiedRecordId = deleteUrl.split("/")[-1]
+        correctRecordDeleted = False
+        if "name" in deletedRecord.keys():
+            if deletedRecord["name"] == specifiedRecordId:
+                correctRecordDeleted = True
+        if "id" in deletedRecord.keys():
+            if deletedRecord["id"] == specifiedRecordId:
+                correctRecordDeleted = True
+        return correctRecordDeleted
+
+    def Delete(self, deleteUrl, httpMethod, minimalState):
 
         # It looks like a delete is simply setting some value to nothing
         # Once deleted, a record for the deleted element will be returned
         # This slightly changes things from the Set() function of this class
-        # Here, our delete function will accept parameters and then enforce a minimal state
+        # Here, our delete function will delete the record and then ensure
+        # that the deleted record matches the url supplied
 
         try:
-            actualState = self.apiWrapper.MakeApiCall(deleteUrl, httpMethod, httpMethodParameters, None)
+            deletedRecord = self.apiWrapper.MakeApiCall(deleteUrl, httpMethod, minimalState, None)
 
-            minimalStateExists = self.Compare(minimalState, actualState)
+            # Check that the deleted record matches what we asked to be deleted
+            correctRecordDeleted = ApiStateEnforcer._confirmDeletedRecord(deleteUrl, deletedRecord)
+            if not correctRecordDeleted:
+                raise DeletedRecordMismatchException(self.SetCompareFailedErrorMessage, deleteUrl, deletedRecord)
 
-            if not minimalStateExists:
-                raise ApiStateEnforcerException(self.SetCompareFailedErrorMessage, minimalState, actualState)
-
-            return actualState
+            return deletedRecord
 
         except Exception as e:
             raise Exception("An error occurred while deleting state.") from e
