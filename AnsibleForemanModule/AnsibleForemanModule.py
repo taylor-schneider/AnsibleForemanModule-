@@ -34,8 +34,14 @@ def run_module():
         # Define available arguments/parameters a user can pass to the module
         # See: https://docs.ansible.com/ansible/latest/dev_guide/developing_modules_general.html
         module_args = dict(
-            param1=dict(type='str', required=True),
-            param2=dict(type='dict', required=False)
+            apiUrl=dict(type='str', required=True),
+            username=dict(type='str', required=True),
+            password=dict(type='str', required=True),
+            verifySsl=dict(type='bool', required=True),
+            desiredState=dict(type='dict', required=False),
+            apiEndpoint = dict(type='bool', required=True),
+            httpMethod = dict(type='bool', required=True),
+
         )
 
         # seed the result dict in the object
@@ -62,12 +68,17 @@ def run_module():
         if module.check_mode:
             return result
 
-        # Now that the module has been created, lets look at the parameters
-        p1 = module.params["param1"]
-        p2 = module.params["param2"]
+        # Now that the module has been created, extract the params
+        apiUrl = module.params["apiUrl"]
+        username = module.params["username"]
+        password = module.params["password"]
+        verifySsl = module.params["verifySsl"]
+        desiredState = module.params["desiredState"]
+        apiEndpoint = module.params["apiEndpoint"]
+        httpMethod = module.params["httpMethod"]
 
-        print("[Inside the ExampleModule] - param1 = '{0}'".format(p1))
-        print("[Inside the ExampleModule] - param2[someKey] = '{0}'".format(p2["someKey"]))
+        # Ensure the desired state exists
+        pass
 
         # Use whatever logic you need to determine whether or not this module
         # made any modifications to your target
