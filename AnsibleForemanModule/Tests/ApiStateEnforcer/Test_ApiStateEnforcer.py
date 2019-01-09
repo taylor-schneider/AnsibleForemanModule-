@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 from ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
-from ApiStateEnforcer import ApiStateEnforcer
+from AnsibleForemanModule.ApiStateEnforcer import ApiStateEnforcer
 
 class Test_ApiStateEnforcer(TestCase):
 

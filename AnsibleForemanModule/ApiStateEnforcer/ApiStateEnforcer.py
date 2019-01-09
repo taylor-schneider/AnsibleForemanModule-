@@ -1,5 +1,5 @@
-from ApiStateEnforcer.StateComparisonException import StateComparisonException
-from ApiStateEnforcer.DeletedRecordMismatchException import DeletedRecordMismatchException
+from AnsibleForemanModule.ApiStateEnforcer import StateComparisonException
+from AnsibleForemanModule.ApiStateEnforcer import DeletedRecordMismatchException
 
 class ApiStateEnforcer():
 
