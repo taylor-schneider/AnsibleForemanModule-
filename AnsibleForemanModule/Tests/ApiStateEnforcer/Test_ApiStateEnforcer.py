@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 from ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
-from AnsibleForemanModule.ApiStateEnforcer import ApiStateEnforcer
+from AnsibleForemanModule.ApiStateEnforcer.ApiStateEnforcer import ApiStateEnforcer
 
 class Test_ApiStateEnforcer(TestCase):
 
@@ -66,15 +66,11 @@ class Test_ApiStateEnforcer(TestCase):
 
         endpoint = "/api/environments/{0}".format(environmentName)
         method = "delete"
-        httpMethodArguments =  {
-            "environment": {}
-        }
-
         minimalState = {
             "name": environmentName,
         }
 
-        actualState = apiStateEnforcer.Delete(endpoint, method, httpMethodArguments, minimalState)
+        actualState = apiStateEnforcer.Delete(endpoint, method, minimalState)
 
         self.assertIsNotNone(actualState)
         self.assertEqual(type(actualState), dict)
