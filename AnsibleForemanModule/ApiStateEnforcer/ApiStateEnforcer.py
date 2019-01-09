@@ -1,13 +1,12 @@
 from AnsibleForemanModule.ApiStateEnforcer.StateComparisonException import StateComparisonException
-from AnsibleForemanModule.ApiStateEnforcer import DeletedRecordMismatchException
+from AnsibleForemanModule.ApiStateEnforcer import ModifiedRecordMismatchException
 
 class ApiStateEnforcer():
 
+    ModifiedRecordMismatchMessage = "The modified record's 'name' and 'id' fields did not match those supplied in the api url."
+
     def __init__(self, apiWrapper):
         self.apiWrapper = apiWrapper
-
-    SetCompareFailedErrorMessage = "The record returned from the set operation did not represent the specified minimal state."
-    DeletedRecordMismatch = "The deleted record's 'name' and 'id' fields did not match those supplied in the api url."
 
     def Check(self, checkUrl, httpMethod):
 
@@ -53,6 +52,36 @@ class ApiStateEnforcer():
         else:
             return minimalState == actualState
 
+    @staticmethod
+    def _GetNameOrIdFromState(state):
+
+        # The state will show what an object should look like
+        # For example:
+        # {
+        #    "environment": {
+        #        "name": "some_environment"
+        #    }
+        # }
+
+        objectName = list(state.keys())[0]
+        object = state[objectName]
+
+        if "name" in object.keys():
+            return object["name"]
+        if "id" in object.keys():
+            return object["id"]
+        raise Exception("Could not determine object name or id from state.")
+
+    @staticmethod
+    def _ConfirmModifiedRecordIdentity(nameOrId, record):
+        if "name" in record.keys():
+            if record["name"] == nameOrId:
+                return True
+        if "id" in record.keys():
+            if record["id"] == nameOrId:
+                return True
+        return False
+
     def Set(self, setUrl, httpMethod, minimalState):
 
         try:
@@ -68,29 +97,19 @@ class ApiStateEnforcer():
             if httpMethod.lower() in ["put", "post"]:
                 headers = {'Content-type': 'application/json'}
 
-            actualState = self.apiWrapper.MakeApiCall(setUrl, httpMethod, minimalState, headers)
+            # When a record is created/updated, the record is returned as the result of the api call
+            # We will need to verify that the record being returned corresponds to the record in question
+            nameOrId = ApiStateEnforcer._GetNameOrIdFromState(minimalState)
+            record = self.apiWrapper.MakeApiCall(setUrl, httpMethod, minimalState, headers)
+            recordMatch = ApiStateEnforcer._ConfirmModifiedRecordIdentity(nameOrId, record)
 
-            minimalStateExists = self.Compare(minimalState, actualState)
+            if not recordMatch:
+                raise ModifiedRecordMismatchException(self.ModifiedRecordMismatchMessage, setUrl, httpMethod, minimalState, record)
 
-            if not minimalStateExists:
-                raise StateComparisonException(self.SetCompareFailedErrorMessage, minimalState, actualState)
-
-            return actualState
+            return record
 
         except Exception as e:
             raise Exception("An error occurred while setting state.") from e
-
-    @staticmethod
-    def _confirmDeletedRecord(deleteUrl, deletedRecord):
-        specifiedRecordId = deleteUrl.split("/")[-1]
-        correctRecordDeleted = False
-        if "name" in deletedRecord.keys():
-            if deletedRecord["name"] == specifiedRecordId:
-                correctRecordDeleted = True
-        if "id" in deletedRecord.keys():
-            if deletedRecord["id"] == specifiedRecordId:
-                correctRecordDeleted = True
-        return correctRecordDeleted
 
     def Delete(self, deleteUrl, httpMethod, minimalState):
 
@@ -101,14 +120,19 @@ class ApiStateEnforcer():
         # that the deleted record matches the url supplied
 
         try:
-            deletedRecord = self.apiWrapper.MakeApiCall(deleteUrl, httpMethod, minimalState, None)
+            record = self.apiWrapper.MakeApiCall(deleteUrl, httpMethod, minimalState, None)
 
-            # Check that the deleted record matches what we asked to be deleted
-            correctRecordDeleted = ApiStateEnforcer._confirmDeletedRecord(deleteUrl, deletedRecord)
-            if not correctRecordDeleted:
-                raise DeletedRecordMismatchException(self.SetCompareFailedErrorMessage, deleteUrl, deletedRecord)
+            # When a record is created/updated, the record is returned as the result of the api call
+            # We will need to verify that the record being returned corresponds to the record in question
 
-            return deletedRecord
+            # In the case of the delete, the name/id is stored as the suffix in the url
+            nameOrId = deleteUrl.split("/")[-1]
+            recordMatch = ApiStateEnforcer._ConfirmModifiedRecordIdentity(nameOrId, record)
+
+            if not recordMatch:
+                raise ModifiedRecordMismatchException(self.ModifiedRecordMismatchMessage, deleteUrl, httpMethod, minimalState, record)
+
+            return record
 
         except Exception as e:
             raise Exception("An error occurred while deleting state.") from e
