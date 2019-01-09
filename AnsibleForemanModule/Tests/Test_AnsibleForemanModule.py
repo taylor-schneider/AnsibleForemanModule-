@@ -1,7 +1,9 @@
 import yaml
+import os
 
 from unittest import TestCase
 
+from AnsibleForemanModule.Tests.AnsibleModuleTester.AnsibleModuleTester.AnsibleUtilities.AnsibleUtility import AnsibleUtility
 
 class Test_AnsibleFormanModule(TestCase):
 
@@ -12,6 +14,10 @@ class Test_AnsibleFormanModule(TestCase):
         self.apiUrl = "https://15.4.7.1"
         self.verifySsl = False
         self.moduleName = "AnsibleForemanModule"
+
+        testsDir = os.path.dirname(os.path.realpath(__file__))
+        ansibleForemanModuleDir = os.path.dirname(testsDir)
+        self.modulePath = ansibleForemanModuleDir + "/" + self.moduleName + ".py"
 
     def _PlaybookTemplate(self):
         playbookYaml = """
@@ -26,7 +32,7 @@ class Test_AnsibleFormanModule(TestCase):
               apiUrl : '{1}'
               username : '{2}'
               password : '{3}'
-              verifyssl: {4}
+              verifySsl: {4}
               apiEndpoint : '{5}'
               httpMethod : '{6}'
               desiredState : {7}
@@ -70,4 +76,5 @@ class Test_AnsibleFormanModule(TestCase):
             httpMethod,
             desiredState)
 
-        s = ""
+        AnsibleUtility.TestModuleUsingPlaybook(self.moduleName, self.modulePath, playbookYaml)
+

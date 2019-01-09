@@ -39,9 +39,8 @@ def run_module():
             password=dict(type='str', required=True),
             verifySsl=dict(type='bool', required=True),
             desiredState=dict(type='dict', required=False),
-            apiEndpoint = dict(type='bool', required=True),
-            httpMethod = dict(type='bool', required=True),
-
+            apiEndpoint = dict(type='str', required=True),
+            httpMethod = dict(type='str', required=True),
         )
 
         # seed the result dict in the object
