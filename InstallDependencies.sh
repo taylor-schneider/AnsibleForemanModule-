@@ -4,5 +4,5 @@ set -e
 
 pip3 install requests
 
-bash Tests/AnsibleModuleTester/InstallDependencies.sh
+bash AnsibleForemanModule/Tests/AnsibleModuleTester/InstallDependencies.sh
 bash ForemanApiWrapper/InstallDependencies.sh
