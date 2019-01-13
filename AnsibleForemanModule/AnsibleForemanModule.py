@@ -27,30 +27,34 @@ RETURN = '''
 
 '''
 
+import sys
 from ansible.module_utils.basic import AnsibleModule
+from ForemanApiWrapper.ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
+from AnsibleForemanModule.ModuleArgumentParser.ModuleArgumentParser import ModuleArgumentParser
+from AnsibleForemanModule.ApiStateEnforcer.ApiStateEnforcer import ApiStateEnforcer
 
 def run_module():
     try:
+
+        # Seed the results dict incase anything happens
+        result = {"changed": False}
+
         # Define available arguments/parameters a user can pass to the module
         # See: https://docs.ansible.com/ansible/latest/dev_guide/developing_modules_general.html
         module_args = dict(
             apiUrl=dict(type='str', required=True),
             username=dict(type='str', required=True),
             password=dict(type='str', required=True),
-            verifySsl=dict(type='bool', required=True),
-            desiredState=dict(type='dict', required=False),
-            apiEndpoint = dict(type='str', required=True),
-            httpMethod = dict(type='str', required=True),
+            verifySsl=dict(type='bool', required=True)
         )
 
-        # seed the result dict in the object
-        # we primarily care about changed and state
-        # change is if this module effectively modified the target
-        # state will include any data that you want your module to pass back
-        # for consumption, for example, in a subsequent task
-        result = dict(
-            changed=False
-        )
+        # Our parameters will change depending on the the desired state supplied by the user
+        # The desired state definition begins with the foreman record type
+        stdinJsonString = sys.argv[1]
+        recordType, desiredState = ModuleArgumentParser.ParseModuleArguments(stdinJsonString)
+
+        # Once we have parsed the arguments we can continue on
+        module_args[recordType] = dict(type='dict', required=True)
 
         # The AnsibleModule object will be our abstraction working with Ansible
         # this includes instantiation, a couple of common attr would be the
@@ -65,26 +69,19 @@ def run_module():
         # want to make any changes to the environment, just return the current
         # state with no modifications
         if module.check_mode:
-            return result
+            raise Exception("Check mode is not yet supported.")
 
         # Now that the module has been created, extract the params
         apiUrl = module.params["apiUrl"]
         username = module.params["username"]
         password = module.params["password"]
         verifySsl = module.params["verifySsl"]
-        desiredState = module.params["desiredState"]
-        apiEndpoint = module.params["apiEndpoint"]
-        httpMethod = module.params["httpMethod"]
+        record = module.params[recordType]
 
         # Ensure the desired state exists
-        pass
-
-        # Use whatever logic you need to determine whether or not this module
-        # made any modifications to your target
-        #
-        # In this example we will just assume it was changed
-        if True:
-            result['changed'] = True
+        apiWrapper = ForemanApiWrapper(username, password, apiUrl, verifySsl)
+        stateEnforcer = ApiStateEnforcer(apiWrapper)
+        result = stateEnforcer.EnsureState(recordType, desiredState, record)
 
         # In the event of a successful module execution, you will want to
         # simple AnsibleModule.exit_json(), passing the key/value results

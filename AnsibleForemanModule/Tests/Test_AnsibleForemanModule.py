@@ -1,9 +1,14 @@
 import yaml
 import os
+import json
 
 from unittest import TestCase
-
+from AnsibleForemanModule import AnsibleForemanModule
 from AnsibleForemanModule.Tests.AnsibleModuleTester.AnsibleModuleTester.AnsibleUtilities.AnsibleUtility import AnsibleUtility
+from AnsibleForemanModule.Tests.AnsibleModuleTester.AnsibleModuleTester.AnsibleUtilities.ContextManager_sys_argv import ContextManager_sys_argv
+from AnsibleForemanModule.Tests.AnsibleModuleTester.AnsibleModuleTester.AnsibleUtilities.ContextManager_StdioCapture import ContextManager_StdioCapture
+
+
 
 class Test_AnsibleFormanModule(TestCase):
 
@@ -33,9 +38,7 @@ class Test_AnsibleFormanModule(TestCase):
               username : '{2}'
               password : '{3}'
               verifySsl: {4}
-              apiEndpoint : '{5}'
-              httpMethod : '{6}'
-              desiredState : {7}
+{5}
             """
 
         return playbookYaml
@@ -45,16 +48,16 @@ class Test_AnsibleFormanModule(TestCase):
         desiredStateYaml = yaml.dump(desiredState, default_flow_style=False)
         paddedYaml = ""
         for line in desiredStateYaml.split("\n"):
-            paddedYaml += "                " + line + "\n"
-        return "\n" + paddedYaml
+            paddedYaml += "              " + line + "\n"
+        return paddedYaml
 
-    def _GeneratePlaybook(self, moduleName, apiUrl, username, password, verifySsl, apiEndpoint, httpMethod, desiredState):
+    def _GeneratePlaybook(self, moduleName, apiUrl, username, password, verifySsl, desiredState):
 
         template = self._PlaybookTemplate()
 
         paddedDesiredStateYaml = self._DesiredStateToPlaybookYaml(desiredState)
 
-        playbook = template.format(moduleName, apiUrl, username, password, verifySsl, apiEndpoint, httpMethod, paddedDesiredStateYaml)
+        playbook = template.format(moduleName, apiUrl, username, password, verifySsl, paddedDesiredStateYaml)
         return playbook
 
     def test_Main_EnsureEnvironmentExists_Success(self):
@@ -76,5 +79,37 @@ class Test_AnsibleFormanModule(TestCase):
             httpMethod,
             desiredState)
 
-        AnsibleUtility.TestModuleUsingPlaybook(self.moduleName, self.modulePath, playbookYaml)
+        AnsibleUtility.RunModuleUsingPlaybook(self.moduleName, self.modulePath, playbookYaml)
 
+    def test__EnsureEnvironmentAbsent_Success_DoesNotExist(self):
+
+        recordName = "test__EnsureEnvironmentAbsent_Success_DoesNotExist"
+        apiEndpoint = "/api/environments"
+        httpMethod = "post"
+        desiredState =  {
+            "environment": {
+                "name": recordName,
+                "state": "absent"
+            }
+        }
+
+        playbookYaml = self._GeneratePlaybook(
+            self.moduleName,
+            self.apiUrl,
+            self.username,
+            self.password,
+            self.verifySsl,
+            desiredState)
+
+        moduleArgsDict = AnsibleUtility.GetModuleArgsDictFromYaml(self.moduleName, playbookYaml)
+        jsonString = AnsibleUtility.GenerateJsonForPlaybookYaml(playbookYaml, self.moduleName, moduleArgsDict)
+
+        # Mock the sys args with the json
+        mockedSysArgs = ["ThisShouldBeThePythonFileNameButWeDontCare.py",  jsonString]
+
+        # Run the module, get the results
+        result = AnsibleUtility.RunModuleUsingPlaybook(self.moduleName, self.modulePath, playbookYaml)
+
+        # Check the results
+        self.assertEqual(result["changed"], False)
+        self.assertFalse("modifiedRecord" in result.keys())

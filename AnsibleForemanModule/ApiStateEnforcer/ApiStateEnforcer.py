@@ -1,5 +1,6 @@
 from AnsibleForemanModule.ApiStateEnforcer.StateComparisonException import StateComparisonException
 from AnsibleForemanModule.ApiStateEnforcer import ModifiedRecordMismatchException
+from ForemanApiWrapper.ForemanApiWrapper.ForemanApiCallException import ForemanApiCallException
 
 class ApiStateEnforcer():
 
@@ -53,24 +54,19 @@ class ApiStateEnforcer():
             return minimalState == actualState
 
     @staticmethod
-    def _GetNameOrIdFromState(state):
+    def _GetNameOrIdFromRecord(record):
 
         # The state will show what an object should look like
         # For example:
-        # {
-        #    "environment": {
+        #    {
         #        "name": "some_environment"
         #    }
-        # }
 
-        objectName = list(state.keys())[0]
-        object = state[objectName]
-
-        if "name" in object.keys():
-            return object["name"]
-        if "id" in object.keys():
-            return object["id"]
-        raise Exception("Could not determine object name or id from state.")
+        if "name" in record.keys():
+            return record["name"]
+        if "id" in record.keys():
+            return record["id"]
+        raise Exception("Could not determine name or id from record.")
 
     @staticmethod
     def _ConfirmModifiedRecordIdentity(nameOrId, record):
@@ -99,7 +95,7 @@ class ApiStateEnforcer():
 
             # When a record is created/updated, the record is returned as the result of the api call
             # We will need to verify that the record being returned corresponds to the record in question
-            nameOrId = ApiStateEnforcer._GetNameOrIdFromState(minimalState)
+            nameOrId = ApiStateEnforcer._GetNameOrIdFromRecord(minimalState)
             record = self.apiWrapper.MakeApiCall(setUrl, httpMethod, minimalState, headers)
             recordMatch = ApiStateEnforcer._ConfirmModifiedRecordIdentity(nameOrId, record)
 
@@ -137,4 +133,54 @@ class ApiStateEnforcer():
         except Exception as e:
             raise Exception("An error occurred while deleting state.") from e
 
+    @staticmethod
+    def _DetermineHttpEndpoint(recordType, nameOrId):
+        return "/api/{0}s/{1}".format(recordType, nameOrId)
+
+    def EnsureState(self, recordType, desiredState, minimalRecordState):
+
+        try:
+            if desiredState.lower() not in ["present", "absent"]:
+                raise Exception("The specified desired state '{0}' was not valid.".format(desiredState))
+
+            # Gather some information for the api
+            nameOrId = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
+            httpEndpoint = ApiStateEnforcer._DetermineHttpEndpoint(recordType, nameOrId)
+
+            # Get the current state
+            # If the api throws a 404, the record does not exist
+            # Otherwise it does exist
+            actualRecordState = None
+            try:
+                actualRecordState = self.Check(httpEndpoint, "get")
+            except ForemanApiCallException as e:
+                if e.results.status_code == 404:
+                    pass
+
+            # Determine what change is required (if any)
+            changeRequired = True
+            if desiredState.lower() == "present":
+                changeRequired = self.Compare(minimalRecordState, actualRecordState)
+            elif desiredState.lower() == "absent" and not actualRecordState:
+                changeRequired = False
+
+            # If not change is required, our work is done
+            if not changeRequired:
+                return { "changed": False }
+
+            # Do the change
+            modifiedRecord = None
+            if desiredState.lower is "present":
+                modifiedRecord = self.Set(httpEndpoint, "post", minimalRecordState)
+            else:
+                modifiedRecord = self.Delete(httpEndpoint,"delete", minimalRecordState)
+
+            # Return the results
+            return {
+                "changed" : changeRequired,
+                "modifiedRecord" : modifiedRecord
+            }
+
+        except Exception as e:
+            raise Exception("An error occurred while ensuring the api state.") from e
 
