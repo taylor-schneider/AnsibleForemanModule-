@@ -1,13 +1,8 @@
 import yaml
 import os
-import json
 
 from unittest import TestCase
-from AnsibleForemanModule import AnsibleForemanModule
 from AnsibleForemanModule.Tests.AnsibleModuleTester.AnsibleModuleTester.AnsibleUtilities.AnsibleUtility import AnsibleUtility
-from AnsibleForemanModule.Tests.AnsibleModuleTester.AnsibleModuleTester.AnsibleUtilities.ContextManager_sys_argv import ContextManager_sys_argv
-from AnsibleForemanModule.Tests.AnsibleModuleTester.AnsibleModuleTester.AnsibleUtilities.ContextManager_StdioCapture import ContextManager_StdioCapture
-
 
 
 class Test_AnsibleFormanModule(TestCase):
@@ -60,14 +55,7 @@ class Test_AnsibleFormanModule(TestCase):
         playbook = template.format(moduleName, apiUrl, username, password, verifySsl, paddedDesiredStateYaml)
         return playbook
 
-    def test_Main_EnsureEnvironmentExists_Success(self):
-        apiEndpoint = "/api/environments"
-        httpMethod = "post"
-        desiredState =  {
-            "environment": {
-                "name": "some_environment"
-            }
-        }
+    def _RunModuleGetResult(self, desiredState):
 
         playbookYaml = self._GeneratePlaybook(
             self.moduleName,
@@ -75,41 +63,75 @@ class Test_AnsibleFormanModule(TestCase):
             self.username,
             self.password,
             self.verifySsl,
-            apiEndpoint,
-            httpMethod,
             desiredState)
 
-        AnsibleUtility.RunModuleUsingPlaybook(self.moduleName, self.modulePath, playbookYaml)
+        # Run the module, get the results
+        result = AnsibleUtility.RunModuleUsingPlaybook(self.moduleName, self.modulePath, playbookYaml)
 
-    def test__EnsureEnvironmentAbsent_Success_DoesNotExist(self):
+        return result
 
-        recordName = "test__EnsureEnvironmentAbsent_Success_DoesNotExist"
-        apiEndpoint = "/api/environments"
-        httpMethod = "post"
+    def test__Ensure_Environment_Present_Success_DoesNotExist(self):
+
+        recordName = "test__Ensure_Environment_Present_Success_DoesNotExist"
+        recortType = "environment"
         desiredState =  {
-            "environment": {
+            recortType: {
+                "name": recordName,
+                "state": "present"
+            }
+        }
+
+        try:
+            result = self._RunModuleGetResult(desiredState)
+
+            # Check the results
+            self.assertTrue(result["changed"])
+            self.assertTrue("modifiedRecord" in result.keys())
+        finally:
+            pass
+            # Now delete this record
+            desiredState[recortType]["state"] = "absent"
+            result = self._RunModuleGetResult(desiredState)
+            self.assertTrue(result["changed"])
+            self.assertTrue("modifiedRecord" in result.keys())
+
+    def test__Ensure_Environment_Absent_Success_DoesNotExist(self):
+        recordName = "test__Ensure_Environment_Absent_Success_DoesNotExist"
+        recortType = "environment"
+        desiredState = {
+            recortType: {
                 "name": recordName,
                 "state": "absent"
             }
         }
 
-        playbookYaml = self._GeneratePlaybook(
-            self.moduleName,
-            self.apiUrl,
-            self.username,
-            self.password,
-            self.verifySsl,
-            desiredState)
-
-        moduleArgsDict = AnsibleUtility.GetModuleArgsDictFromYaml(self.moduleName, playbookYaml)
-        jsonString = AnsibleUtility.GenerateJsonForPlaybookYaml(playbookYaml, self.moduleName, moduleArgsDict)
-
-        # Mock the sys args with the json
-        mockedSysArgs = ["ThisShouldBeThePythonFileNameButWeDontCare.py",  jsonString]
-
-        # Run the module, get the results
-        result = AnsibleUtility.RunModuleUsingPlaybook(self.moduleName, self.modulePath, playbookYaml)
+        result = self._RunModuleGetResult(desiredState)
 
         # Check the results
-        self.assertEqual(result["changed"], False)
+        self.assertFalse(result["changed"])
         self.assertFalse("modifiedRecord" in result.keys())
+
+    def test__Ensure_Environment_Absent_Success_Deleted(self):
+
+        recordName = "test__Ensure_Environment_Absent_Success_Deleted"
+        recortType = "environment"
+        desiredState =  {
+            recortType: {
+                "name": recordName,
+                "state": "present"
+            }
+        }
+
+        result = self._RunModuleGetResult(desiredState)
+
+        # Check the results
+        self.assertTrue(result["changed"])
+        self.assertTrue("modifiedRecord" in result.keys())
+
+        # Now delete this record
+        desiredState[recortType]["state"] = "absent"
+        result = self._RunModuleGetResult(desiredState)
+        self.assertTrue(result["changed"])
+        self.assertTrue("modifiedRecord" in result.keys())
+
+

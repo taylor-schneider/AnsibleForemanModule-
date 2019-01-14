@@ -4,12 +4,21 @@ from ForemanApiWrapper.ForemanApiWrapper.ForemanApiCallException import ForemanA
 
 class ApiStateEnforcer():
 
+    StateMismatchMessage = "The actual state did not match the desired state."
+    RecordAlreadyAbsentMessage = "Record is already absent."
+    MissingRecordMessage =  "Record does not exist and it should."
+    ExtraRecordMessage = "Record exists and it should not."
+
     ModifiedRecordMismatchMessage = "The modified record's 'name' and 'id' fields did not match those supplied in the api url."
 
     def __init__(self, apiWrapper):
         self.apiWrapper = apiWrapper
 
-    def Check(self, checkUrl, httpMethod):
+    def Check(self, recordType, minimalRecordState):
+
+        nameOrId = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
+        checkUrl = "/api/{0}s/{1}".format(recordType, nameOrId)
+        httpMethod = "get"
 
         return self.apiWrapper.MakeApiCall(checkUrl, httpMethod)
 
@@ -78,9 +87,13 @@ class ApiStateEnforcer():
                 return True
         return False
 
-    def Set(self, setUrl, httpMethod, minimalState):
+    def Set(self, recordType, minimalRecordState):
 
         try:
+            nameOrId = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
+            setUrl = "/api/{0}s/".format(recordType)
+            httpMethod = "POST"
+
             # Foreman's API specifies that put and post api calls must set the Content-type header
             # If we dont, we will get an exception as follows:
             #       Exception.args[0]:
@@ -95,8 +108,8 @@ class ApiStateEnforcer():
 
             # When a record is created/updated, the record is returned as the result of the api call
             # We will need to verify that the record being returned corresponds to the record in question
-            nameOrId = ApiStateEnforcer._GetNameOrIdFromRecord(minimalState)
-            record = self.apiWrapper.MakeApiCall(setUrl, httpMethod, minimalState, headers)
+
+            record = self.apiWrapper.MakeApiCall(setUrl, httpMethod, minimalRecordState, headers)
             recordMatch = ApiStateEnforcer._ConfirmModifiedRecordIdentity(nameOrId, record)
 
             if not recordMatch:
@@ -107,7 +120,7 @@ class ApiStateEnforcer():
         except Exception as e:
             raise Exception("An error occurred while setting state.") from e
 
-    def Delete(self, deleteUrl, httpMethod, minimalState):
+    def Delete(self, recordType, minimalRecordState):
 
         # It looks like a delete is simply setting some value to nothing
         # Once deleted, a record for the deleted element will be returned
@@ -116,7 +129,11 @@ class ApiStateEnforcer():
         # that the deleted record matches the url supplied
 
         try:
-            record = self.apiWrapper.MakeApiCall(deleteUrl, httpMethod, minimalState, None)
+            nameOrId = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
+            deleteUrl = "/api/{0}s/{1}".format(recordType, nameOrId)
+            httpMethod = "DELETE"
+
+            record = self.apiWrapper.MakeApiCall(deleteUrl, httpMethod, minimalRecordState, None)
 
             # When a record is created/updated, the record is returned as the result of the api call
             # We will need to verify that the record being returned corresponds to the record in question
@@ -126,16 +143,12 @@ class ApiStateEnforcer():
             recordMatch = ApiStateEnforcer._ConfirmModifiedRecordIdentity(nameOrId, record)
 
             if not recordMatch:
-                raise ModifiedRecordMismatchException(self.ModifiedRecordMismatchMessage, deleteUrl, httpMethod, minimalState, record)
+                raise ModifiedRecordMismatchException(self.ModifiedRecordMismatchMessage, deleteUrl, httpMethod, minimalRecordState, record)
 
             return record
 
         except Exception as e:
             raise Exception("An error occurred while deleting state.") from e
-
-    @staticmethod
-    def _DetermineHttpEndpoint(recordType, nameOrId):
-        return "/api/{0}s/{1}".format(recordType, nameOrId)
 
     def EnsureState(self, recordType, desiredState, minimalRecordState):
 
@@ -143,42 +156,51 @@ class ApiStateEnforcer():
             if desiredState.lower() not in ["present", "absent"]:
                 raise Exception("The specified desired state '{0}' was not valid.".format(desiredState))
 
-            # Gather some information for the api
-            nameOrId = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
-            httpEndpoint = ApiStateEnforcer._DetermineHttpEndpoint(recordType, nameOrId)
-
             # Get the current state
             # If the api throws a 404, the record does not exist
             # Otherwise it does exist
             actualRecordState = None
             try:
-                actualRecordState = self.Check(httpEndpoint, "get")
+                actualRecordState = self.Check(recordType, minimalRecordState)
             except ForemanApiCallException as e:
                 if e.results.status_code == 404:
                     pass
 
             # Determine what change is required (if any)
-            changeRequired = True
             if desiredState.lower() == "present":
-                changeRequired = self.Compare(minimalRecordState, actualRecordState)
-            elif desiredState.lower() == "absent" and not actualRecordState:
-                changeRequired = False
+                if not actualRecordState:
+                    reason = self.MissingRecordMessage
+                    changeRequired = True
+                else:
+                    changeRequired = self.Compare(minimalRecordState, actualRecordState)
+                    reason = self.StateMismatchMessage
+            if desiredState.lower() == "absent":
+                if not actualRecordState:
+                    changeRequired = False
+                    reason = self.RecordAlreadyAbsentMessage
+                else:
+                    reason = self.ExtraRecordMessage
+                    changeRequired = True
 
             # If not change is required, our work is done
             if not changeRequired:
-                return { "changed": False }
+                return { "changed": False, "reason": reason}
 
             # Do the change
             modifiedRecord = None
-            if desiredState.lower is "present":
-                modifiedRecord = self.Set(httpEndpoint, "post", minimalRecordState)
-            else:
-                modifiedRecord = self.Delete(httpEndpoint,"delete", minimalRecordState)
+            if reason == self.MissingRecordMessage:
+                modifiedRecord = self.Set(recordType, minimalRecordState)
+            elif reason == self.ExtraRecordMessage:
+                modifiedRecord = self.Delete(recordType, minimalRecordState)
+            elif reason == self.StateMismatchMessage:
+                modifiedRecord = self.Delete(recordType, minimalRecordState)
+                modifiedRecord = self.Set(recordType, minimalRecordState)
 
             # Return the results
             return {
                 "changed" : changeRequired,
-                "modifiedRecord" : modifiedRecord
+                "modifiedRecord" : modifiedRecord,
+                "reason": reason
             }
 
         except Exception as e:
