@@ -34,6 +34,7 @@ from AnsibleForemanModule.ModuleArgumentParser.ModuleArgumentParser import Modul
 from AnsibleForemanModule.ApiStateEnforcer.ApiStateEnforcer import ApiStateEnforcer
 
 def run_module():
+    module = None
     try:
 
         # Seed the results dict incase anything happens
@@ -51,7 +52,7 @@ def run_module():
         # Our parameters will change depending on the the desired state supplied by the user
         # The desired state definition begins with the foreman record type
         stdinJsonString = sys.argv[1]
-        recordType, desiredState = ModuleArgumentParser.ParseModuleArguments(stdinJsonString)
+        recordType, desiredState, record = ModuleArgumentParser.ParseModuleArguments(stdinJsonString)
 
         # Once we have parsed the arguments we can continue on
         module_args[recordType] = dict(type='dict', required=True)
@@ -76,7 +77,6 @@ def run_module():
         username = module.params["username"]
         password = module.params["password"]
         verifySsl = module.params["verifySsl"]
-        record = module.params[recordType]
 
         # Ensure the desired state exists
         apiWrapper = ForemanApiWrapper(username, password, apiUrl, verifySsl)
@@ -88,7 +88,11 @@ def run_module():
         module.exit_json(**result)
 
     except Exception as e:
-        module.fail_json(msg='The module failed to run.', **result)
+        errorMsg = 'The module failed to run.'
+        if module:
+            module.fail_json(msg=errorMsg, **result)
+        else:
+            raise Exception(errorMsg) from e
 
 def main():
     run_module()

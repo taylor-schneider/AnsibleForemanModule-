@@ -1,5 +1,5 @@
 from AnsibleForemanModule.ApiStateEnforcer.StateComparisonException import StateComparisonException
-from AnsibleForemanModule.ApiStateEnforcer import ModifiedRecordMismatchException
+from AnsibleForemanModule.ApiStateEnforcer.ModifiedRecordMismatchException import ModifiedRecordMismatchException
 from ForemanApiWrapper.ForemanApiWrapper.ForemanApiCallException import ForemanApiCallException
 
 class ApiStateEnforcer():
@@ -91,7 +91,7 @@ class ApiStateEnforcer():
 
         try:
             nameOrId = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
-            setUrl = "/api/{0}s/".format(recordType)
+            setUrl = "/api/{0}s".format(recordType)
             httpMethod = "POST"
 
             # Foreman's API specifies that put and post api calls must set the Content-type header
@@ -104,7 +104,7 @@ class ApiStateEnforcer():
 
             headers = {}
             if httpMethod.lower() in ["put", "post"]:
-                headers = {'Content-type': 'application/json'}
+                headers = {'Content-type': 'application/json', "charset": "utf-8"}
 
             # When a record is created/updated, the record is returned as the result of the api call
             # We will need to verify that the record being returned corresponds to the record in question
@@ -113,7 +113,7 @@ class ApiStateEnforcer():
             recordMatch = ApiStateEnforcer._ConfirmModifiedRecordIdentity(nameOrId, record)
 
             if not recordMatch:
-                raise ModifiedRecordMismatchException(self.ModifiedRecordMismatchMessage, setUrl, httpMethod, minimalState, record)
+                raise ModifiedRecordMismatchException(self.ModifiedRecordMismatchMessage, setUrl, httpMethod, minimalRecordState, record)
 
             return record
 
@@ -172,7 +172,8 @@ class ApiStateEnforcer():
                     reason = self.MissingRecordMessage
                     changeRequired = True
                 else:
-                    changeRequired = self.Compare(minimalRecordState, actualRecordState)
+                    statesMatch = self.Compare(minimalRecordState, actualRecordState)
+                    changeRequired = not  statesMatch
                     reason = self.StateMismatchMessage
             if desiredState.lower() == "absent":
                 if not actualRecordState:

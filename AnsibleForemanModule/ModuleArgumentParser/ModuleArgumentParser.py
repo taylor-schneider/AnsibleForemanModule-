@@ -15,7 +15,7 @@ class ModuleArgumentParser():
             # This is dynamic and could be anything
             # We will have to check the argument keys against a blacklist
 
-            knownParameterNames = ["apiUrl", "username", "password", "verifySsl"]
+            knownParameterNames = ["apiUrl", "username", "password", "verifySsl", "state"]
             stdinJsonDict = json.loads(stdinJsonString)
             possibleRecordTypes = []
             for key, value in stdinJsonDict['ANSIBLE_MODULE_ARGS'].items():
@@ -35,7 +35,13 @@ class ModuleArgumentParser():
 
             desiredState = record["state"]
 
-            return recordType, desiredState
+            # After that we can remove the state key from the record
+            # The field was for the ansible module and is not recognized by
+            # foreman's api
+
+            record.pop("state", None)
+
+            return recordType, desiredState, record
 
         except Exception as e:
             raise Exception("An error occurred while parsing ") from e
