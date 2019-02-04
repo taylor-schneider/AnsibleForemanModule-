@@ -89,6 +89,7 @@ def run_module():
 
     except Exception as e:
         errorMsg = 'The module failed to run.'
+        result["exception"] = e
         if module:
             module.fail_json(msg=errorMsg, **result)
         else:
