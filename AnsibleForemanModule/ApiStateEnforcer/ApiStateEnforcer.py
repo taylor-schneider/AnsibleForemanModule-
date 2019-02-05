@@ -19,8 +19,9 @@ class ApiStateEnforcer():
     def Check(self, recordType, minimalRecordState):
 
         nameOrId, nameOrIdValue = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
-        endpointSuffix = ApiStateEnforcer._FormatNameOrIdForApiUrl(nameOrId, nameOrIdValue)
-        checkUrl = "/api/{0}s/{1}".format(recordType, endpointSuffix)
+        nameOrIdForUrl = ApiStateEnforcer._FormatNameOrIdForApiUrl(nameOrId, nameOrIdValue)
+        endpointSuffix = ApiStateEnforcer._GetApiUrlSuffixForRecordType(recordType)
+        checkUrl = "/api/{0}/{1}".format(endpointSuffix, nameOrIdForUrl)
         httpMethod = "GET"
 
         record =  self.apiWrapper.MakeApiCall(checkUrl, httpMethod)
@@ -83,6 +84,36 @@ class ApiStateEnforcer():
         raise Exception("Could not determine name or id from record.")
 
     @staticmethod
+    def _GetApiUrlSuffixForRecordType(recordType):
+        # Most of the records map directly to the api endpoint
+        # for example environment record type maps to the /api/environments endpoint
+        # Some record types break this model, and we have a mapping file for this
+
+        # Get the path to the mapping file
+        currentFilePath = os.path.realpath(__file__)
+        currentDirectory = os.path.dirname(currentFilePath)
+        mappingFileDirectory = os.path.join(currentDirectory, "MappingFiles")
+        mappingFilePath = os.path.join(mappingFileDirectory, "ApiRecordToUrlSuffixMapping.json")
+
+        # Read the json text from the file
+        fileText = None
+        with open(mappingFilePath, 'r') as mappingfile:
+            fileText = mappingfile.read()
+
+        # Deserialize it into an object
+        mappings = json.loads(fileText)
+
+        # Set the default endpoint
+        endpointSuffix = "{0}s".format(recordType)
+
+        # Check if the record type is contained in the mapping
+        # If it is, override the default endpoint
+        if recordType in mappings.keys():
+            endpointSuffix = mappings[recordType]
+
+        return endpointSuffix
+
+    @staticmethod
     def _FormatNameOrIdForApiUrl(nameOrId, nameOrIdValue):
         endpoint = nameOrIdValue
         if nameOrId == "id":
@@ -105,7 +136,8 @@ class ApiStateEnforcer():
 
         currentFilePath = os.path.realpath(__file__)
         currentDirectory = os.path.dirname(currentFilePath)
-        mappingFilePath = os.path.join(currentDirectory, "ApiRecordPropertyNameMappings.json")
+        mappingFileDirectory = os.path.join(currentDirectory, "MappingFiles")
+        mappingFilePath = os.path.join(mappingFileDirectory, "ApiRecordPropertyNameMappings.json")
 
         # Read the json text from the file
         fileText = None
@@ -171,8 +203,8 @@ class ApiStateEnforcer():
 
         try:
             nameOrId, nameOrIdValue = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
-            endpointSuffix = ApiStateEnforcer._FormatNameOrIdForApiUrl(nameOrId, nameOrIdValue)
-            setUrl = "/api/{0}s".format(recordType, endpointSuffix)
+            endpointSuffix = ApiStateEnforcer._GetApiUrlSuffixForRecordType(recordType)
+            setUrl = "/api/{0}".format(endpointSuffix)
             httpMethod = "POST"
 
             headers = ForemanApiWrapper._GetHeadersForHttpMethod(httpMethod)
@@ -201,8 +233,9 @@ class ApiStateEnforcer():
 
         try:
             nameOrId, nameOrIdValue = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
-            endpointSuffix = ApiStateEnforcer._FormatNameOrIdForApiUrl(nameOrId, nameOrIdValue)
-            setUrl = "/api/{0}s/{1}".format(recordType, endpointSuffix)
+            nameOrIdForUrl = ApiStateEnforcer._FormatNameOrIdForApiUrl(nameOrId, nameOrIdValue)
+            endpointSuffix = ApiStateEnforcer._GetApiUrlSuffixForRecordType(recordType)
+            setUrl = "/api/{0}/{1}".format(endpointSuffix, nameOrIdForUrl)
             httpMethod = "PUT"
 
             # Foreman's API specifies that put and post api calls must set the Content-type header
@@ -247,8 +280,9 @@ class ApiStateEnforcer():
 
         try:
             nameOrId, nameOrIdValue = ApiStateEnforcer._GetNameOrIdFromRecord(minimalRecordState)
-            endpointSuffix = ApiStateEnforcer._FormatNameOrIdForApiUrl(nameOrId, nameOrIdValue)
-            deleteUrl = "/api/{0}s/{1}".format(recordType, endpointSuffix)
+            nameOrIdForUrl = ApiStateEnforcer._FormatNameOrIdForApiUrl(nameOrId, nameOrIdValue)
+            endpointSuffix = ApiStateEnforcer._GetApiUrlSuffixForRecordType(recordType)
+            deleteUrl = "/api/{0}/{1}".format(endpointSuffix, nameOrIdForUrl)
             httpMethod = "DELETE"
 
             record = self.apiWrapper.MakeApiCall(deleteUrl, httpMethod, minimalRecordState, None)
