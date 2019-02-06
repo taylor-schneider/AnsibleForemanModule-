@@ -216,7 +216,7 @@ class ApiStateEnforcer():
             # The api call will expect the arguments in a certain form
             apiCallArguments = ApiStateEnforcer._GetApiCallArguments(recordType, recordForPost)
 
-            record = self.apiWrapper.MakeApiCall(setUrl, httpMethod, minimalRecordState, headers)
+            record = self.apiWrapper.MakeApiCall(setUrl, httpMethod, apiCallArguments, headers)
             # When a record is created/updated, the record is returned as the result of the api call
             # We will need to verify that the record being returned corresponds to the record in question
             recordMatch = ApiStateEnforcer._ConfirmModifiedRecordIdentity(nameOrIdValue, record)
