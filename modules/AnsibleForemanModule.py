@@ -32,8 +32,8 @@ import logging
 
 from ansible.module_utils.basic import AnsibleModule
 from ForemanApiWrapper.ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
-from AnsibleForemanModule.ModuleArgumentParser.ModuleArgumentParser import ModuleArgumentParser
-from AnsibleForemanModule.ApiStateEnforcer.ApiStateEnforcer import ApiStateEnforcer
+from module_utils.ModuleArgumentParser.ModuleArgumentParser import ModuleArgumentParser
+from module_utils.ApiStateEnforcer import ApiStateEnforcer
 
 logger = logging.getLogger()
 

@@ -3,7 +3,7 @@ import os
 import logging
 
 from unittest import TestCase
-from AnsibleForemanModule.Tests.AnsibleModuleTester.AnsibleModuleTester.AnsibleUtilities.AnsibleUtility import AnsibleUtility
+from Tests.AnsibleModuleTester.AnsibleModuleTester.AnsibleUtilities.AnsibleUtility import AnsibleUtility
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)

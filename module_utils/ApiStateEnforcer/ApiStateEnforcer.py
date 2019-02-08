@@ -1,6 +1,6 @@
 import json
 import os
-from AnsibleForemanModule.ApiStateEnforcer.ModifiedRecordMismatchException import ModifiedRecordMismatchException
+from module_utils.ApiStateEnforcer import ModifiedRecordMismatchException
 from ForemanApiWrapper.ForemanApiWrapper.ForemanApiCallException import ForemanApiCallException
 from ForemanApiWrapper.ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
 
