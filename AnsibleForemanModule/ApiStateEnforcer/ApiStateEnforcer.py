@@ -10,6 +10,7 @@ class ApiStateEnforcer():
     RecordAlreadyAbsentMessage = "Record is already absent."
     MissingRecordMessage =  "Record does not exist and it should."
     ExtraRecordMessage = "Record exists and it should not."
+    StatesMatchMessage = "The actual state matches the desired state."
 
     ModifiedRecordMismatchMessage = "The modified record's 'name' or 'id' fields did not match those supplied in the api url."
 
@@ -27,6 +28,50 @@ class ApiStateEnforcer():
         record =  self.apiWrapper.MakeApiCall(checkUrl, httpMethod)
         return record
 
+    def _CompareDicts(self, minimalState, actualState):
+        actualKeys = list(actualState.keys())
+
+        # If a key is missing that is a dead givaway
+        for key, value in minimalState.items():
+            if key not in actualKeys:
+                return False
+
+            # Call this function recursively
+            # Return false if any of the keys dont match
+
+            minimalValue = minimalState[key]
+            actualValue = actualState[key]
+
+            comparisonResult = self.Compare(minimalValue, actualValue)
+            if not comparisonResult:
+                return False
+
+        # If we got here without exiting, we match!
+        return True
+
+    def _CompareLists(self, minimalState, actualState):
+        # If the minimal state list is smaller than the actual state,
+        # something is definitely missing
+        if len(minimalState) > len(actualState):
+            return False
+
+        # Lists are a bit complicated to compare
+        # We are not enforcing order here
+        # We will need to compare a given element of the minimal state
+        # with all the elements of the actual state to find a match
+        for x in range(0, len(minimalState)):
+            match = False
+            a = minimalState[x]
+            for b in actualState:
+                match = self.Compare(a, b)
+                if match:
+                    break
+            if not match:
+                return False
+
+        # If we got here without exiting, we match!
+        return True
+
     def Compare(self, minimalState, actualState):
 
         # This function will return true or false based on whether or not the
@@ -43,25 +88,13 @@ class ApiStateEnforcer():
 
         # Dictionaries are an axample of this
         if isinstance(minimalState, dict):
-            actualKeys = list(actualState.keys())
+            match =  self._CompareDicts(minimalState, actualState)
+            return match
 
-            # If a key is missing that is a dead givaway
-            for key,value in minimalState.items():
-                if key not in actualKeys:
-                    return False
-
-                # Call this function recursively
-                # Return false if any of the keys dont match
-
-                actualValue = actualState[key]
-                minimalValue = minimalState[key]
-
-                comparisonResult = self.Compare(minimalValue, actualValue)
-                if not comparisonResult:
-                    return False
-
-            # If we got here without exiting, we match!
-            return True
+        # Lists are also an example of this issue
+        if isinstance(minimalState, list):
+            match =  self._CompareLists(minimalState, actualState)
+            return match
 
         # lists and other objects should compare just fine
         else:
@@ -302,6 +335,33 @@ class ApiStateEnforcer():
         except Exception as e:
             raise Exception("An error occurred while deleting state.") from e
 
+    def _DetermineChangeRequired(self, desiredState, minimalRecordState, actualRecordState):
+        reason = None
+        changeRequired = False
+
+        if desiredState.lower() == "present":
+            if not actualRecordState:
+                reason = self.MissingRecordMessage
+                changeRequired = True
+            else:
+                statesMatch = self.Compare(minimalRecordState, actualRecordState)
+                changeRequired = not statesMatch
+
+                if statesMatch:
+                    reason = self.StatesMatchMessage
+                else:
+                    reason = self.StateMismatchMessage
+
+        if desiredState.lower() == "absent":
+            if not actualRecordState:
+                changeRequired = False
+                reason = self.RecordAlreadyAbsentMessage
+            else:
+                reason = self.ExtraRecordMessage
+                changeRequired = True
+
+        return changeRequired, reason
+
     def EnsureState(self, recordType, desiredState, minimalRecordState):
 
         try:
@@ -319,43 +379,36 @@ class ApiStateEnforcer():
                     pass
 
             # Determine what change is required (if any)
-            if desiredState.lower() == "present":
-                if not actualRecordState:
-                    reason = self.MissingRecordMessage
-                    changeRequired = True
-                else:
-                    statesMatch = self.Compare(minimalRecordState, actualRecordState)
-                    changeRequired = not  statesMatch
-                    reason = self.StateMismatchMessage
-            if desiredState.lower() == "absent":
-                if not actualRecordState:
-                    changeRequired = False
-                    reason = self.RecordAlreadyAbsentMessage
-                else:
-                    reason = self.ExtraRecordMessage
-                    changeRequired = True
+            changeRequired, reason = self._DetermineChangeRequired(desiredState, minimalRecordState, actualRecordState)
 
             # If not change is required, our work is done
             if not changeRequired:
-                return { "changed": False, "reason": reason}
+                return {
+                    "changed": False,
+                    "reason": reason,
+                    "actualRecordState": actualRecordState,
+                    "desiredRecordState": desiredState
+                }
 
             # Do the change
-            modifiedRecord = None
+            modifiedRecordState = None
             if reason == self.MissingRecordMessage:
-                modifiedRecord = self.Set(recordType, minimalRecordState)
+                modifiedRecordState = self.Set(recordType, minimalRecordState)
             elif reason == self.ExtraRecordMessage:
-                modifiedRecord = self.Delete(recordType, minimalRecordState)
+                modifiedRecordState = self.Delete(recordType, minimalRecordState)
             elif reason == self.StateMismatchMessage:
                 # Do the update rather than a delete / set
                 # modifiedRecord = self.Delete(recordType, minimalRecordState)
                 # modifiedRecord = self.Set(recordType, minimalRecordState)
-                modifiedRecord = self.Update(recordType, minimalRecordState)
+                modifiedRecordState = self.Update(recordType, minimalRecordState)
 
             # Return the results
             return {
-                "changed" : changeRequired,
-                "modifiedRecord" : modifiedRecord,
-                "reason": reason
+                "changed": True,
+                "reason": reason,
+                "actualRecordState": modifiedRecordState,
+                "desiredRecordState": desiredState,
+                "originalRecordState": actualRecordState
             }
 
         except Exception as e:

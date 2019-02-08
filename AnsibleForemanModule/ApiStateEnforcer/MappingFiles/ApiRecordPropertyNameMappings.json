@@ -11,7 +11,7 @@
 	},
 	"post" : {
 		"subnet" : {
-			"domain_ids" : "domains"
+			"domains" : "domain_ids"
 		}
 	}
 }

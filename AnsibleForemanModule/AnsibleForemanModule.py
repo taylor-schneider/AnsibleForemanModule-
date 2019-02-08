@@ -28,10 +28,14 @@ RETURN = '''
 '''
 
 import sys
+import logging
+
 from ansible.module_utils.basic import AnsibleModule
 from ForemanApiWrapper.ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
 from AnsibleForemanModule.ModuleArgumentParser.ModuleArgumentParser import ModuleArgumentParser
 from AnsibleForemanModule.ApiStateEnforcer.ApiStateEnforcer import ApiStateEnforcer
+
+logger = logging.getLogger()
 
 def run_module():
     module = None
@@ -51,6 +55,14 @@ def run_module():
 
         # Our parameters will change depending on the the desired state supplied by the user
         # The desired state definition begins with the foreman record type
+        if len(sys.argv) < 2:
+            if len(sys.argv) == 1:
+                logger.error("Only one arg was supplied to stdin:")
+                logger.error(sys.argv[0])
+            else:
+                logger.error("No args were supplied to stdin.")
+            raise Exception("The required arguments were not passed to the module.")
+
         stdinJsonString = sys.argv[1]
         recordType, desiredState, record = ModuleArgumentParser.ParseModuleArguments(stdinJsonString)
 
