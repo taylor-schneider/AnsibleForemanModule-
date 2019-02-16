@@ -13,3 +13,9 @@
 [submodule "AnsibleForemanModule/Tests/AnsibleModuleTester"]
 	path = AnsibleForemanModule/Tests/AnsibleModuleTester
 	url = http://10.4.9.1/tschneider/AnsibleModuleTester.git
+[submodule "module_utils/ForemanApiWrapper"]
+	path = module_utils/ForemanApiWrapper
+	url = http://10.4.9.1/tschneider/ForemanApiWrapper.git
+[submodule "Tests/AnsibleModuleTester"]
+	path = Tests/AnsibleModuleTester
+	url = http://10.4.9.1/tschneider/AnsibleModuleTester.git

@@ -27,13 +27,14 @@ RETURN = '''
 
 '''
 
-import sys
 import logging
 
+import os
+for line in os.environ['PYTHONPATH'].split(os.pathsep):
+    print(line)
+
 from ansible.module_utils.basic import AnsibleModule
-from ForemanApiWrapper.ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
-from module_utils.ModuleArgumentParser.ModuleArgumentParser import ModuleArgumentParser
-from module_utils.ApiStateEnforcer import ApiStateEnforcer
+from ansible.module_utils.foobar.foo import foo
 
 logger = logging.getLogger()
 
@@ -50,24 +51,16 @@ def run_module():
             apiUrl=dict(type='str', required=True),
             username=dict(type='str', required=True),
             password=dict(type='str', required=True),
-            verifySsl=dict(type='bool', required=True)
+            verifySsl=dict(type='bool', required=True),
+            record=dict(type='dict', required=True),
+            action=dict(type='str', required=True),
+            state=dict(type='str', required=False)
         )
 
-        # Our parameters will change depending on the the desired state supplied by the user
-        # The desired state definition begins with the foreman record type
-        if len(sys.argv) < 2:
-            if len(sys.argv) == 1:
-                logger.error("Only one arg was supplied to stdin:")
-                logger.error(sys.argv[0])
-            else:
-                logger.error("No args were supplied to stdin.")
-            raise Exception("The required arguments were not passed to the module.")
-
-        stdinJsonString = sys.argv[1]
-        recordType, desiredState, record = ModuleArgumentParser.ParseModuleArguments(stdinJsonString)
+#        recordType, desiredState, record = ModuleArgumentParser.ParseModuleArguments(stdinJsonString)
 
         # Once we have parsed the arguments we can continue on
-        module_args[recordType] = dict(type='dict', required=True)
+#        module_args[recordType] = dict(type='dict', required=True)
 
         # The AnsibleModule object will be our abstraction working with Ansible
         # this includes instantiation, a couple of common attr would be the
@@ -90,10 +83,13 @@ def run_module():
         password = module.params["password"]
         verifySsl = module.params["verifySsl"]
 
+
         # Ensure the desired state exists
-        apiWrapper = ForemanApiWrapper(username, password, apiUrl, verifySsl)
-        stateEnforcer = ApiStateEnforcer(apiWrapper)
-        result = stateEnforcer.EnsureState(recordType, desiredState, record)
+#        apiWrapper = ForemanApiWrapper(username, password, apiUrl, verifySsl)
+#        stateEnforcer = ApiStateEnforcer(apiWrapper)
+#        result = stateEnforcer.EnsureState(recordType, desiredState, record)
+        result = {}
+        result["foo"] = foo.foo()
 
         # In the event of a successful module execution, you will want to
         # simple AnsibleModule.exit_json(), passing the key/value results

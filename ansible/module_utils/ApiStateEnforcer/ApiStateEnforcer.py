@@ -1,8 +1,8 @@
 import json
 import os
-from module_utils.ApiStateEnforcer import ModifiedRecordMismatchException
-from ForemanApiWrapper.ForemanApiWrapper.ForemanApiCallException import ForemanApiCallException
-from ForemanApiWrapper.ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
+import ModifiedRecordMismatchException
+from ForemanApiWrapper import ForemanApiCallException
+from ForemanApiWrapper import ForemanApiWrapper
 
 class ApiStateEnforcer():
 

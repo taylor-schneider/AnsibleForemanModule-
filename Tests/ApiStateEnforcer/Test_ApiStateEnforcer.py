@@ -1,7 +1,8 @@
 from unittest import TestCase
 
-from ForemanApiWrapper.ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
-from module_utils.ApiStateEnforcer import ApiStateEnforcer
+from ForemanApiWrapper.ForemanApiWrapper import ForemanApiWrapper
+import ApiStateEnforcer
+
 
 class Test_ApiStateEnforcer(TestCase):
 
