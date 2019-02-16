@@ -19,3 +19,6 @@
 [submodule "Tests/AnsibleModuleTester"]
 	path = Tests/AnsibleModuleTester
 	url = http://10.4.9.1/tschneider/AnsibleModuleTester.git
+[submodule "tests/AnsibleModuleTester"]
+	path = tests/AnsibleModuleTester
+	url = http://10.4.9.1/tschneider/AnsibleModuleTester.git
