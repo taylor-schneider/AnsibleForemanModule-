@@ -22,7 +22,7 @@ class Test_AnsibleFormanModule(TestCase):
 
         testsDir = os.path.dirname(os.path.realpath(__file__))
         rootDir = os.path.dirname(testsDir)
-        self.modulePath = rootDir + "/ansible/library/"
+        self.modulePath = rootDir + "/ansible/modules/"
 
     def _PlaybookTemplate(self):
         playbookYaml = """
