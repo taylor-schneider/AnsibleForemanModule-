@@ -1,14 +1,13 @@
 import yaml
 import os
 import logging
-
 from unittest import TestCase
-
-from AnsibleModuleTester.AnsibleUtilities.AnsibleUtility import AnsibleUtility
+from AnsibleModuleTester.TestingUtilities import AnsibleUtility
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
+
 
 class Test_AnsibleFormanModule(TestCase):
 
@@ -19,33 +18,36 @@ class Test_AnsibleFormanModule(TestCase):
         self.apiUrl = "https://15.4.7.1"
         self.verifySsl = False
         self.moduleName = "AnsibleForemanModule"
+        self.taskName = "This is my task to execute my module"
 
         testsDir = os.path.dirname(os.path.realpath(__file__))
         rootDir = os.path.dirname(testsDir)
         self.modulePath = rootDir + "/ansible/modules/"
 
-    def _PlaybookTemplate(self):
+    def _playbook_template(self):
+
+        # This function will generate a playbook to run a single play
+        # The play will have a single task
+        # The task will use the AnsibleForemanModule
+
         playbookYaml = """
         - hosts: localhost
           remote_user: root
           tasks:
-          - set_fact: my_global_var='hello'
-          - name: "Re-run setup to use custom facts"
-            setup: ~
-          - name : "This is my task to execute my module"
-            {0}:
-              apiUrl : '{1}'
-              username : '{2}'
-              password : '{3}'
-              verifySsl: {4}          
+          - name : {0}
+            {1}:
+              apiUrl : '{2}'
+              username : '{3}'
+              password : '{4}'
+              verifySsl: {5}          
               record:
-{5}
+{6}
               action: provision
-              state: {6}"""
+              state: {7}"""
 
         return playbookYaml
 
-    def _DesiredStateToPlaybookYaml(self, desiredState):
+    def _generate_padded_yaml_for_desired_state(self, desiredState):
 
         desiredStateYaml = yaml.dump(desiredState, default_flow_style=False)
         paddedYaml = ""
@@ -53,20 +55,19 @@ class Test_AnsibleFormanModule(TestCase):
             paddedYaml += "                " + line + "\n"
         return paddedYaml
 
-    def _GeneratePlaybook(self, moduleName, apiUrl, username, password, verifySsl, record, state):
+    def _generate_playbook(self, moduleName, apiUrl, username, password, verifySsl, record, state):
 
-        template = self._PlaybookTemplate()
+        template = self._playbook_template()
 
-        paddedRecordYaml = self._DesiredStateToPlaybookYaml(record)
-
+        paddedRecordYaml = self._generate_padded_yaml_for_desired_state(record)
         paddedRecordYaml = paddedRecordYaml.rstrip()
 
-        playbook = template.format(moduleName, apiUrl, username, password, verifySsl, paddedRecordYaml, state)
+        playbook = template.format(self.taskName, moduleName, apiUrl, username, password, verifySsl, paddedRecordYaml, state)
         return playbook
 
-    def _RunModuleGetResult(self, record, state):
+    def _run_ansible_forman_module(self, record, state):
 
-        playbookYaml = self._GeneratePlaybook(
+        playbookYaml = self._generate_playbook(
             self.moduleName,
             self.apiUrl,
             self.username,
@@ -76,7 +77,8 @@ class Test_AnsibleFormanModule(TestCase):
             state)
 
         # Run the module, get the results
-        result = AnsibleUtility.DebugPlaybook(playbookYaml, ["This is my task to execute my module"], True, [self.modulePath])
+        cleanup = True
+        result = AnsibleUtility.test_playbook(playbookYaml, [self.taskName], cleanup, [self.modulePath])
 
         return result
 
@@ -92,7 +94,7 @@ class Test_AnsibleFormanModule(TestCase):
         state = "present"
 
         try:
-            result = self._RunModuleGetResult(record, state)
+            result = self._run_ansible_forman_module(record, state)
 
             # Check the results
             #self.assertTrue(result["changed"])
@@ -101,7 +103,7 @@ class Test_AnsibleFormanModule(TestCase):
             pass
             # Now delete this record
             state =  "absent"
-            result = self._RunModuleGetResult(record, state)
+            result = self._run_ansible_forman_module(record, state)
             #self.assertTrue(result["changed"])
             #self.assertTrue("modifiedRecord" in result.keys())
 
@@ -115,7 +117,7 @@ class Test_AnsibleFormanModule(TestCase):
             }
         }
 
-        result = self._RunModuleGetResult(desiredState)
+        result = self._run_ansible_forman_module(desiredState, "absent")
 
         # Check the results
         self.assertFalse(result["changed"])
@@ -132,15 +134,17 @@ class Test_AnsibleFormanModule(TestCase):
             }
         }
 
-        result = self._RunModuleGetResult(desiredState)
+        playbookResult = self._run_ansible_forman_module(desiredState, "absent")
+        playResult = playbookResult[0]
+        taskResult = playResult[self.taskName]
 
         # Check the results
-        self.assertTrue(result["changed"])
-        self.assertTrue("modifiedRecord" in result.keys())
+        self.assertTrue(taskResult["changed"])
+        self.assertTrue("modifiedRecord" in taskResult.keys())
 
         # Now delete this record
         desiredState[recortType]["state"] = "absent"
-        result = self._RunModuleGetResult(desiredState)
+        result = self._run_ansible_forman_module(desiredState)
         self.assertTrue(result["changed"])
         self.assertTrue("modifiedRecord" in result.keys())
 
