@@ -1,9 +1,10 @@
 import yaml
 import os
 import logging
+import json
 from unittest import TestCase
 from AnsibleModuleTester.TestingUtilities import AnsibleUtility
-
+from ForemanApiWrapper.RecordUtilities import RecordComparison
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -86,66 +87,81 @@ class Test_AnsibleFormanModule(TestCase):
 
         recordName = "test__Ensure_Environment_Present_Success_DoesNotExist"
         recortType = "environment"
-        record =  {
-            recortType: {
-                "name": recordName
-            }
+        minimal_record = {
+            "name": recordName
         }
-        state = "present"
+        playbook_record = {
+            recortType: minimal_record
+        }
+        desired_state = "present"
 
         try:
-            result = self._run_ansible_forman_module(record, state)
+            playbook_results = self._run_ansible_forman_module(playbook_record, desired_state)
+            play_results = playbook_results[0]
+            task_results = play_results[self.taskName]
+            record_modification_receipt = json.loads(task_results)
+            actual_record = record_modification_receipt["actual_record"]
 
             # Check the results
-            #self.assertTrue(result["changed"])
-            #self.assertTrue("modifiedRecord" in result.keys())
+            self.assertTrue(record_modification_receipt["changed"])
+            self.assertTrue(RecordComparison.compare_record_states(minimal_record, actual_record))
+
         finally:
-            pass
-            # Now delete this record
-            state =  "absent"
-            result = self._run_ansible_forman_module(record, state)
-            #self.assertTrue(result["changed"])
-            #self.assertTrue("modifiedRecord" in result.keys())
+            # Cleanup after the test
+            desired_state = "absent"
+            self._run_ansible_forman_module(playbook_record, desired_state)
 
     def test__Ensure_Environment_Absent_Success_DoesNotExist(self):
+
         recordName = "test__Ensure_Environment_Absent_Success_DoesNotExist"
         recortType = "environment"
-        desiredState = {
-            recortType: {
-                "name": recordName,
-                "state": "absent"
-            }
+        minimal_record = {
+            "name": recordName
         }
+        playbook_record = {
+            recortType: minimal_record
+        }
+        desired_state = "absent"
 
-        result = self._run_ansible_forman_module(desiredState, "absent")
+        playbook_results = self._run_ansible_forman_module(playbook_record, desired_state)
+        play_results = playbook_results[0]
+        task_results = play_results[self.taskName]
+        record_modification_receipt = json.loads(task_results)
+        actual_record = record_modification_receipt["actual_record"]
 
         # Check the results
-        self.assertFalse(result["changed"])
-        self.assertFalse("modifiedRecord" in result.keys())
+        self.assertFalse(record_modification_receipt["changed"])
+        self.assertIsNone(actual_record)
 
     def test__Ensure_Environment_Absent_Success_Deleted(self):
 
         recordName = "test__Ensure_Environment_Absent_Success_Deleted"
         recortType = "environment"
-        desiredState =  {
-            recortType: {
-                "name": recordName,
-                "state": "present"
-            }
+        minimal_record = {
+            "name": recordName
         }
+        playbook_record = {
+            recortType: minimal_record
+        }
+        desired_state = "present"
 
-        playbookResult = self._run_ansible_forman_module(desiredState, "absent")
-        playResult = playbookResult[0]
-        taskResult = playResult[self.taskName]
+        try:
+            # Create the object so we can delete it
+            self._run_ansible_forman_module(playbook_record, "absent")
 
-        # Check the results
-        self.assertTrue(taskResult["changed"])
-        self.assertTrue("modifiedRecord" in taskResult.keys())
+            # Do the delete
+            playbook_results = self._run_ansible_forman_module(playbook_record, desired_state)
+            play_results = playbook_results[0]
+            task_results = play_results[self.taskName]
+            record_modification_receipt = json.loads(task_results)
+            actual_record = record_modification_receipt["actual_record"]
 
-        # Now delete this record
-        desiredState[recortType]["state"] = "absent"
-        result = self._run_ansible_forman_module(desiredState)
-        self.assertTrue(result["changed"])
-        self.assertTrue("modifiedRecord" in result.keys())
+            # Check the results
+            self.assertTrue(record_modification_receipt["changed"])
+            self.assertTrue(RecordComparison.compare_record_states(minimal_record, actual_record))
+
+        finally:
+            # Cleanup after the test
+             self._run_ansible_forman_module(playbook_record, "absent")
 
 

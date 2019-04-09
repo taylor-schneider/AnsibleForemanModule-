@@ -11,7 +11,8 @@ install_requires = [
     "pyyaml",
     "ansible",
     "yamlordereddictloader",
-    "AnsibleModulePatcher"
+    "AnsibleModulePatcher",
+    "ForemanApiWrapper"
 ]
 
 
@@ -25,7 +26,7 @@ source_code_dir = "src"
 
 
 # Specify the name of the package as we want it to appear using pip
-package_name = "AnsibleModuleTester"
+package_name = "AnsibleForemanModule"
 
 
 setuptools.setup(

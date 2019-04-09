@@ -20,23 +20,32 @@ EXAMPLES = '''
 RETURN = '''
 
 '''
-
+import sys
+import json
 from ansible.module_utils.basic import AnsibleModule
-from ForemanApiUtilities.ForemanApiWrapper import ForemanApiWrapper
-from ApiStateEnforcer.ApiStateEnforcer import ApiStateEnforcer
+from ForemanApiWrapper.ForemanApiUtilities.ForemanApiWrapper import ForemanApiWrapper
+from ForemanApiWrapper.ApiStateEnforcer.ApiStateEnforcer import ApiStateEnforcer
+from ForemanApiWrapper.RecordUtilities import ForemanApiRecord
+
+PY3 = sys.version_info >= (3, 0)
+
 
 def run_module():
     module = None
+    result = {}
     try:
-
         module_args = dict(
             apiUrl=dict(type='str', required=True),
             username=dict(type='str', required=True),
             password=dict(type='str', required=True),
             verifySsl=dict(type='bool', required=True),
             record=dict(type='dict', required=True),
-            action=dict(type='str', required=True),
             state=dict(type='str', required=False)
+        )
+
+        module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=False
         )
 
         # If the user is working with this module in only check mode we do not
@@ -53,13 +62,12 @@ def run_module():
         desiredState = module.params["state"]
         record = module.params["record"]
 
-        # The record should contain the record type
-        recordType = ApiStateEnforcer._get_record_type_from_record(record)
-
         # Ensure the desired state exists
         foremanApiWrapper = ForemanApiWrapper(username, password, apiUrl, verifySsl)
         apiStateEnforcer = ApiStateEnforcer(foremanApiWrapper)
-        result = apiStateEnforcer.EnsureState(recordType, desiredState, record)
+        modification_receipt = apiStateEnforcer.ensure_state(desiredState, record)
+
+        result.update(modification_receipt.__dict__)
 
         # In the event of a successful module execution, you will want to
         # simple AnsibleModule.exit_json(), passing the key/value results
