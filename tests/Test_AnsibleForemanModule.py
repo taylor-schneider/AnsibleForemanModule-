@@ -5,6 +5,8 @@ import json
 from unittest import TestCase
 from AnsibleModuleTester.TestingUtilities import AnsibleUtility
 from ForemanApiWrapper.RecordUtilities import RecordComparison
+from ForemanApiWrapper.RecordUtilities import ForemanApiRecord
+from ForemanApiWrapper.ForemanApiUtilities.ForemanApiWrapper import ForemanApiWrapper
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -18,6 +20,8 @@ class Test_AnsibleFormanModule(TestCase):
         self.password = "password"
         self.apiUrl = "https://15.4.7.1"
         self.verifySsl = False
+        self.api_wrapper = ForemanApiWrapper(self.username, self.password, self.apiUrl, self.verifySsl)
+
         self.moduleName = "AnsibleForemanModule"
         self.taskName = "This is my task to execute my module"
 
@@ -43,7 +47,6 @@ class Test_AnsibleFormanModule(TestCase):
               verifySsl: {5}          
               record:
 {6}
-              action: provision
               state: {7}"""
 
         return playbookYaml
@@ -85,6 +88,7 @@ class Test_AnsibleFormanModule(TestCase):
 
     def test__Ensure_Environment_Present_Success_DoesNotExist(self):
 
+        # Create the record for the playbook
         recordName = "test__Ensure_Environment_Present_Success_DoesNotExist"
         recortType = "environment"
         minimal_record = {
@@ -96,15 +100,20 @@ class Test_AnsibleFormanModule(TestCase):
         desired_state = "present"
 
         try:
+
+            # Run the playbook to create the record
             playbook_results = self._run_ansible_forman_module(playbook_record, desired_state)
             play_results = playbook_results[0]
             task_results = play_results[self.taskName]
             record_modification_receipt = json.loads(task_results)
             actual_record = record_modification_receipt["actual_record"]
 
-            # Check the results
+            # Check the results and make sure the record did not exist originally
             self.assertTrue(record_modification_receipt["changed"])
-            self.assertTrue(RecordComparison.compare_record_states(minimal_record, actual_record))
+
+            record_identifier_field, record_identifier = ForemanApiRecord.get_identifier_from_record(playbook_record, self.api_wrapper.property_name_mappings)
+            record_type = ForemanApiRecord.get_record_type_from_record(playbook_record)
+            ForemanApiRecord.confirm_modified_record_identity(record_identifier, record_type, actual_record)
 
         finally:
             # Cleanup after the test
@@ -146,19 +155,20 @@ class Test_AnsibleFormanModule(TestCase):
         desired_state = "present"
 
         try:
-            # Create the object so we can delete it
+            # Delete the record if it exists
             self._run_ansible_forman_module(playbook_record, "absent")
 
-            # Do the delete
+            # Create the record
             playbook_results = self._run_ansible_forman_module(playbook_record, desired_state)
             play_results = playbook_results[0]
             task_results = play_results[self.taskName]
             record_modification_receipt = json.loads(task_results)
             actual_record = record_modification_receipt["actual_record"]
 
-            # Check the results
-            self.assertTrue(record_modification_receipt["changed"])
-            self.assertTrue(RecordComparison.compare_record_states(minimal_record, actual_record))
+            # Check that it was created
+            record_identifier_field, record_identifier = ForemanApiRecord.get_identifier_from_record(playbook_record, self.api_wrapper.property_name_mappings)
+            record_type = ForemanApiRecord.get_record_type_from_record(playbook_record)
+            ForemanApiRecord.confirm_modified_record_identity(record_identifier, record_type, actual_record)
 
         finally:
             # Cleanup after the test
