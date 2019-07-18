@@ -1,0 +1,106 @@
+<%#
+kind: provision
+name: CentOS Kickstart Template
+model: ProvisioningTemplate
+oses:
+- CentOS
+- Fedora
+- RedHat
+%>
+
+# Create some vars for later
+<%
+  os_major = @host.operatingsystem.major.to_i
+%>
+
+# =====================================
+# Command Section
+# =====================================
+
+# Set system authorization information
+auth --useshadow --passalgo=<%= @host.operatingsystem.password_hash.downcase || 'sha256' %>
+
+# Run the Setup Agent on first boot
+firstboot --enable
+
+# Keyboard layouts
+keyboard <%= host_param('keyboard') || 'us' %>
+
+# System language
+lang <%= host_param('lang') || 'en_US.UTF-8' %>
+
+# Configure the network
+<% subnet = @host.subnet -%>
+<% if subnet.respond_to?(:dhcp_boot_mode?) -%>
+<% dhcp = subnet.dhcp_boot_mode? && !@static -%>
+<% else -%>
+<% dhcp = !@static -%>
+<% end -%>
+
+network --bootproto <%= dhcp ? 'dhcp' : "static --ip=#{@host.ip} --netmask=#{subnet.mask} --gateway=#{subnet.gateway} --nameserver=#{[subnet.dns_primary, subnet.dns_secondary].select{ |item| item.present? }.join(',')} --mtu=#{subnet.mtu.to_s}" %> --hostname <%= @host %><%= os_major >= 6 ? " --device=#{@host.mac}" : '' -%>
+
+# Set the password for the root user
+rootpw --iscrypted <%= root_pass %>
+
+# Set SELinux
+selinux --<%= host_param('selinux-mode') || host_param('selinux') || 'enforcing' %>
+
+# configure the timezone
+timezone --utc <%= host_param('time-zone') || 'UTC' %>
+
+# Configure the installer to use the media URL
+install 
+<%= @mediapath %>
+
+# Set the installer to only run on new installations
+firstboot --enable
+
+# Select the hard disk to install to 
+ignoredisk --only-use=xvda
+
+# Use the text display mode
+text
+
+# Configure the bootloader
+bootloader --location=mbr --location=mbr --append="<%= host_param('bootloader-append') || 'nofb quiet splash=quiet' %>" <%= @grub_pass %>
+
+# Tell the system not to wipe any partitions and give the new one the default name label
+clearpart --none --initlabel
+
+# Tell the system to auto partition the install
+autopart --type=lvm
+
+# Tell the system to reboot after install complete
+reboot
+
+# =====================================
+# Packages Section
+# =====================================
+
+%packages
+@^minimal
+@core
+chrony
+kexec-tools
+
+%end
+
+# =====================================
+# End Section
+# =====================================
+
+# Configure anaconda to use the kdump addon
+# This will allow the installation to create crash dumps in the event of kernel panic during instllation
+
+%addon com_redhat_kdump --enable --reserve-mb='auto'
+%end
+
+# Execute a post installation command to alert Foreman that the build has completed
+
+%post
+wget -q -O /dev/null --no-check-certificate <%= foreman_url('built') %>
+) 2>&1 | tee /root/install.post.log
+exit 0
+%end
+
+

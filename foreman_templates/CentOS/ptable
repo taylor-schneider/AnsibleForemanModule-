@@ -1,0 +1,8 @@
+<%#
+kind: ptable
+name: CentOS Partition Table
+model: Ptable
+oses:
+- CentOS
+-%>
+

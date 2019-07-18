@@ -111,7 +111,7 @@ class Test_AnsibleFormanModule(TestCase):
             # Check the results and make sure the record did not exist originally
             self.assertTrue(record_modification_receipt["changed"])
 
-            record_identifier_field, record_identifier = ForemanApiRecord.get_identifier_from_record(playbook_record, self.api_wrapper.property_name_mappings)
+            record_identifier_field, record_identifier = ForemanApiRecord.get_identifier_from_record(playbook_record)
             record_type = ForemanApiRecord.get_record_type_from_record(playbook_record)
             ForemanApiRecord.confirm_modified_record_identity(record_identifier, record_type, actual_record)
 
@@ -166,7 +166,7 @@ class Test_AnsibleFormanModule(TestCase):
             actual_record = record_modification_receipt["actual_record"]
 
             # Check that it was created
-            record_identifier_field, record_identifier = ForemanApiRecord.get_identifier_from_record(playbook_record, self.api_wrapper.property_name_mappings)
+            record_identifier_field, record_identifier = ForemanApiRecord.get_identifier_from_record(playbook_record)
             record_type = ForemanApiRecord.get_record_type_from_record(playbook_record)
             ForemanApiRecord.confirm_modified_record_identity(record_identifier, record_type, actual_record)
 

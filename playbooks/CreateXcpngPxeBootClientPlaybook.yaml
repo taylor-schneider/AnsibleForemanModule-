@@ -1,0 +1,61 @@
+- hosts: localhost
+  remote_user: root
+  vars:
+    # Specify whether we want to create things or destroy them
+    state: "present"
+    # Foreman connection parameters
+    username : admin
+    password : password
+    apiUrl : "https://15.4.7.1"
+    verifySsl: False
+    # Foreman configuration parameters
+    smartProxyFqdn: "foreman.foobar.com"
+    pxqFqdn: "pxe.foobar.com"
+    # Iso Mirror / Install media parameters
+    mediaName : "CentOS"
+    osFamily : "Redhat"
+    mirrorPath : "http://15.4.7.1:8080/xcp-ng/$major.$minor/os/$arch"
+    templateDir: "http://15.4.7.1:8080/foreman_templates"
+    major: "7"
+    minor: "5.0"
+    # XCP-ng parameters
+    xenserver_hostname : "15.4.3.1"
+    xenserver_username : "root"
+    xenserver_password : "Rootlogpass1"
+    vm_template : "CentOS 7"
+    vm_network_name: "Network 0"
+    # VM parameters
+    vm_name : "Ansible_PXE"
+    vm_mac : "76:06:64:d0:46:d5"
+    vm_ip : "15.4.21.21"
+    vm_netmask : "255.0.0.0"
+    vm_disk_size_gb : "75"
+    vm_num_cpus: 4
+    vm_num_cpu_cores_per_socket: 4
+    vm_memory_mb: 2048
+
+  tasks:
+
+    - name: Create a VM from a template
+      xenserver_guest:
+        hostname: "{{ xenserver_hostname }}"
+        username: "{{ xenserver_username }}"
+        password: "{{ xenserver_password }}"
+        validate_certs: no
+        name: " {{ vm_name }} "
+        state: poweredon
+        template: "{{ vm_template }}"
+        disks:
+        - size_gb: "{{ vm_disk_size_gb }}"
+          sr: "Local storage"
+        hardware:
+          num_cpus: "{{ vm_num_cpus }}"
+          num_cpu_cores_per_socket: "{{ vm_num_cpu_cores_per_socket }}"
+          memory_mb: "{{ vm_memory_mb }}"
+        cdrom:
+          type: none
+        networks:
+        - name: "{{ vm_network_name }}"
+          mac: "{{ vm_mac }}"
+        wait_for_ip_address: yes
+      register: xenserver_guest_results

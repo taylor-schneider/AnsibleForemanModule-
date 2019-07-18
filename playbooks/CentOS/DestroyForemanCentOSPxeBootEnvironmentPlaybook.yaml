@@ -1,0 +1,330 @@
+- hosts: localhost
+  remote_user: root
+  vars:
+    # Specify whether we want to create things or destroy them
+    state: "present"
+
+    # Foreman API Connection parameters
+    username : admin
+    password : password
+    apiUrl : "https://15.4.7.1"
+    verifySsl: False
+
+    # Iso Mirror / Install media parameters
+    os_name: "CentOS"
+    os_description: "{{ os_name }} Operating System"
+    media_name : "{{ os_name }}"
+    os_family : "Redhat"
+    mirror_url : "http://15.4.7.1:8080/{{ media_name }}/$major.$minor/os/$arch"
+    major: "7"
+    minor: "5.0"
+
+    # Foreman PXE Boot Environment Paramters
+    smart_proxy_fqdn: "foreman.foobar.com"
+    pxe_domain: "pxe.foobar.com"      # This is the domain suffix for hosts being created in the pxe domain
+    subnet_name: "PxeSubnet"
+    subnet_network: "15.0.0.0"
+    subnet_mask: "255.0.0.0"
+    subnet_gateway: "15.1.1.1"
+    subnet_dns_primary: "15.4.7.1"
+    subnet_dns_secondary: "15.1.1.1"
+    subnet_boot_mode: "DHCP"
+
+    # Foreman Template parameters
+    template_dir_url : "http://15.4.7.1:8080/ForemanTemplates/{{ media_name }}"
+    answerfile_url : "{{ template_dir_url }}/answerfile"
+    pxelinux_url : "{{ template_dir_url }}/pxelinux"
+    partition_table_url : "{{ template_dir_url }}/ptable"
+
+    answerfile_name : "{{ os_name }} Kickstart Template"
+    pxelinux_name: "{{ os_name }} PXELinux Template"
+    ptable_name : "{{ os_name }} Partition Table"
+
+    # Host parameters
+    host_ip : "15.4.21.70"
+    host_mac : "76:06:64:d0:46:a2"
+    host_name : "test-centos"
+
+  tasks:
+
+  # ================================================================================
+  # Delete the Host
+  # ================================================================================
+
+#  - name: "Destroy the PXE Boot Host"
+#    AnsibleForemanModule:
+#      username: "{{ username }}"
+#      password: "{{ password }}"
+#      apiUrl: "{{ apiUrl }}"
+#      verifySsl: "{{ verifySsl }}"
+#      record:
+#        host:
+#          name: "{{ host_name }}"
+#          mac : "{{ host_mac }}"
+#      state: "{{ state }}"
+#    register: provisioning_template_results
+
+  # ================================================================================
+  # Un-link the Foreman objects required to PXE boot a host
+  # ================================================================================
+
+  - name: "UnLink the PXE Operating System with the provisioning templates"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        operatingsystem:
+          name: "{{ os_name }}"
+          major: "{{ major }}"
+          minor: "{{ minor }}"
+          description: "{{ os_description }}"
+          family: "{{ os_family }}"
+          password_hash: "SHA256"
+          architecture_ids: []
+          config_template_ids: []
+          provisioning_template_ids: []
+          medium_ids: []
+          ptable_ids: []
+      state: "present"
+    register: os_results
+
+  - name: "Unlink the PXE Boot Partitioning Table with the PXE Operating System"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        ptable:
+          name: "{{ ptable_name }}"
+          os_family: "{{ os_family }}"
+          operatingsystem_ids: []
+          layout: "This is a dummy layout to make the api happy"
+          locked: false
+      state: "present"
+
+  - name: "Unlink the PXE PXELinux Provisioning Template with the PXE Operating System"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        provisioning_template:
+          name: "{{ pxelinux_name }}"
+          template: "This is a dummy template to make the api happy"
+          locked: false
+          template_kind_id: 5
+          operatingsystem_ids : []
+      state: "present"
+    register: provisioning_template_results
+
+  - name: "Unlink the PXE OS Answer File with the PXE Operating System"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        provisioning_template:
+          name: "{{ answerfile_name }}"
+          locked: false
+          template: "This is a dummy template to make the api happy"
+          template_kind_id: 5
+          operatingsystem_ids : []
+      state: "present"
+    register: answerfile_results
+
+  - name: "Un-Set the default Provisioning Template for the PXE Operating system"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        os_default_template:
+          operatingsystem_id: "{{ os_results.actual_record.operatingsystem.id }}"
+          template_kind_id: "{{ provisioning_template_results.actual_record.provisioning_template.template_kind_id }}"
+          provisioning_template_id: "{{ provisioning_template_results.actual_record.provisioning_template.id }}"
+        dependencies:
+          - operatingsystem:
+              id: "{{ os_results.actual_record.operatingsystem.id }}"
+              name: "{{ os_results.actual_record.operatingsystem.name }}"
+              description: "{{ os_results.actual_record.operatingsystem.description }}"
+      state: "{{ state }}"
+    register: os_link_results
+
+  - name: "Un-Set the default Answer File for the PXE Operating system"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        os_default_template:
+          operatingsystem_id: "{{ os_results.actual_record.operatingsystem.id }}"
+          provisioning_template_id: "{{ answerfile_results.actual_record.provisioning_template.id }}"
+        dependencies:
+          - operatingsystem:
+              id: "{{ os_results.actual_record.operatingsystem.id }}"
+              name: "{{ os_name }}"
+              description: "{{ os_description }}"
+      state: "{{ state }}"
+    register: os_link_results
+
+  # ================================================================================
+  # Delete the template files used by the PXE Process
+  # ================================================================================
+
+  - name: "Delete PXE Boot Partitioning Table"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        ptable:
+          name: "{{ ptable_name }}"
+      state: "{{ state }}"
+
+  - name: "Delete the PXE PXELinux Provisioning Template"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        provisioning_template:
+          name: "{{ ptable_name }}"
+      state: "{{ state }}"
+    register: provisioning_template_results
+
+  - name: "Delete PXE OS Answer File"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        provisioning_template:
+          name: "{{ answerfile_name }}"
+      state: "{{ state }}"
+
+  # ================================================================================
+  # Delete the operating system objects used to configure a host for PXE boot
+  # ================================================================================
+
+  - name: "Delete PXE Boot Installation Media"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        medium:
+          name: "{{ media_name }}"
+      state: "{{ state }}"
+    register: medium_results
+
+  - name: "Delete PXE Operating System"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        operatingsystem:
+          name: "{{ os_name }}"
+      state: "{{ state }}"
+    register: os_results
+
+  # Dont telete the architecture because we are using it elsewhere
+  # - name: "Delete PXE Boot Architecture"
+  #   AnsibleForemanModule:
+  #     username: "{{ username }}"
+  #     password: "{{ password }}"
+  #     apiUrl: "{{ apiUrl }}"
+  #     verifySsl: "{{ verifySsl }}"
+  #     record:
+  #       architecture:
+  #         name: "x86_64"
+  #     state: "{{ state }}"
+  #   register: architecture_results
+
+  # ================================================================================
+  # Delete the Foreman objects required for PXE booting
+  # ================================================================================
+
+  - name: "Unlink PXE Boot Subnet from the smart proxy"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        subnet:
+          name: "{{ subnet_name}}"
+          network: "{{ subnet_network}}"
+          mask: "{{ subnet_mask}}"
+          gateway: "{{ subnet_gateway }}"
+          dns_primary: "{{ subnet_dns_primary }}"
+          dns_secondary: "{{ subnet_dns_secondary }}"
+          boot_mode: "{{ subnet_boot_mode }}"
+          domain_ids: []
+          dhcp_id:  ""
+          tftp_id:  ""
+          dns_id:  ""
+      state: "present"
+
+  - name: "Delete PXE Boot Subnet"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        subnet:
+          name: "{{ subnet_name }}"
+      state: "{{ state }}"
+
+  - name: "Unlink PXE Boot Domain with the SMART Proxy"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        domain:
+          name: "{{ pxe_domain }}"
+          dns_id: ""
+      state: "present"
+    register: domain_results
+
+  - name: "Delete PXE Boot Domain"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        domain:
+          name: "{{ pxe_domain }}"
+      state: "{{ state }}"
+    register: domain_results
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

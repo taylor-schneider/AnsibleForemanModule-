@@ -1,0 +1,366 @@
+- hosts: localhost
+  remote_user: root
+  vars:
+    # Specify whether we want to create things or destroy them
+    state: "present"
+    
+    # Foreman API Connection parameters
+    username : admin
+    password : password
+    apiUrl : "https://15.4.7.1"
+    verifySsl: False
+
+    # Iso Mirror / Install media parameters
+    os_name: "CentOS"
+    os_description: "{{ os_name }} Operating System"
+    media_name : "{{ os_name }}"
+    os_family : "Redhat"
+    mirror_url : "http://15.4.7.1:8080/{{ media_name }}/$major.$minor/os/$arch"
+    major: "7"
+    minor: "5.0"
+
+    # Foreman PXE Boot Environment Paramters
+    smart_proxy_fqdn: "foreman.foobar.com"
+    pxe_domain: "pxe.foobar.com"      # This is the domain suffix for hosts being created in the pxe domain
+    subnet_name: "PxeSubnet"
+    subnet_network: "15.0.0.0"
+    subnet_mask: "255.0.0.0"
+    subnet_gateway: "15.1.1.1"
+    subnet_dns_primary: "15.4.7.1"
+    subnet_dns_secondary: "15.1.1.1"
+    subnet_boot_mode: "DHCP"
+
+    # Foreman Template parameters
+    template_dir_url : "http://15.4.7.1:8080/ForemanTemplates/{{ media_name }}"
+    answerfile_url : "{{ template_dir_url }}/answerfile"
+    pxelinux_url : "{{ template_dir_url }}/pxelinux"
+    partition_table_url : "{{ template_dir_url }}/ptable"
+
+    answerfile_name : "{{ os_name }} Kickstart Template"
+    pxelinux_name: "{{ os_name }} PXELinux Template"
+    ptable_name : "{{ os_name }} Partition Table"
+
+    # Host parameters
+    host_ip : "15.4.21.70"
+    host_mac : "76:06:64:d0:46:a2"
+    host_name : "test-centos"
+
+  tasks:
+
+  # ================================================================================
+  # Create the Foreman objects required for PXE booting
+  # ================================================================================
+
+    - name: "Get SMART Proxy info"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          smart_proxy:
+            name: "{{ smart_proxy_fqdn }}"
+            features:
+              - name: "TFTP"
+              - name: "DNS"
+              - name: "DHCP"
+        state: "{{ state }}"
+      register: smart_proxy_results
+
+    - name: "Create a Domain for the PXE environment"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          domain:
+            name: "{{ pxe_domain }}"
+            dns_id: "{{ smart_proxy_results.actual_record.smart_proxy.id | int }}"
+        state: "{{ state }}"
+      register: domain_results
+
+    - name: "Create a Subnet for the PXE environment"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          subnet:
+            name: "{{ subnet_name}}"
+            network: "{{ subnet_network}}"
+            mask: "{{ subnet_mask}}"
+            gateway: "{{ subnet_gateway }}"
+            dns_primary: "{{ subnet_dns_primary }}"
+            dns_secondary: "{{ subnet_dns_secondary }}"
+            boot_mode: "{{ subnet_boot_mode }}"
+            domain_ids:
+              - "{{ domain_results.actual_record.domain.id }}"
+            dhcp_id:  "{{ smart_proxy_results.actual_record.smart_proxy.id  }}"
+            tftp_id:  "{{ smart_proxy_results.actual_record.smart_proxy.id  }}"
+            dns_id:  "{{ smart_proxy_results.actual_record.smart_proxy.id  }}"
+        state: "{{ state }}"
+      register: subnet_results
+
+  # ================================================================================
+  # Create the operating system objects used to configure a host for PXE boot
+  # ================================================================================
+
+    - name: "Create an Architecture for the PXE environment"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          architecture:
+            name: "x86_64"
+        state: "{{ state }}"
+      register: architecture_results
+
+    - name: "Create an Installation Media for the PXE environment"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          medium:
+            name: "{{ media_name }}"
+            os_family: "{{ os_family }}"
+            path: "{{ mirror_url }}"
+        state: "{{ state }}"
+      register: medium_results
+
+    - name: "Create an Operating System for the PXE environment"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          operatingsystem:
+            name: "{{ os_name }}"
+            major: "{{ major }}"
+            minor: "{{ minor }}"
+            description: "{{ os_description }}"
+            family: "{{ os_family }}"
+            password_hash: "SHA256"
+            architecture_ids: []
+            config_template_ids: []
+            provisioning_template_ids: []
+            medium_ids: []
+            ptable_ids: []
+        state: "{{ state }}"
+      register: os_results
+
+  # ================================================================================
+  # Download the template files used by the PXE Process
+  # ================================================================================
+
+    - name: "Download Partition Table template"
+      uri:
+        url: "{{  partition_table_url }}"
+        return_content: true
+      register: ptable_file
+
+    - name: "Download PXELinux Provisioning Template"
+      uri:
+        url: "{{ pxelinux_url }}"
+        return_content: true
+      register: pxelinux_file
+
+    - name: "Download Answer File Template"
+      uri:
+        url: "{{ answerfile_url }}"
+        return_content: true
+      register: answer_file
+
+  # ================================================================================
+  # Upload the templates and associate them with the Foreman objects used in the PXE boot Process
+  # ================================================================================
+
+    - name: "Create the Partitioning Table and link it with the PXE Operating System"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          ptable:
+            name: "{{ ptable_name }}"
+            layout: "{{ ptable_file['content'] }}"
+            os_family: "{{ os_family }}"
+            operatingsystem_ids: [ "{{ os_results.actual_record.operatingsystem.id }}"]
+        state: "{{ state }}"
+      register: ptable_results
+
+    - name: "Create the PXELinux Provisioning Template and link it with the PXE Operating System"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          provisioning_template:
+            name: "{{ pxelinux_name }}"
+            template:  "{{ pxelinux_file['content'] }}"
+            snippet: false
+            audit_comment: ""
+            template_kind_id: 1
+            operatingsystem_ids: [ "{{ os_results.actual_record.operatingsystem.id }}"]
+            locked: false
+        state: "{{ state }}"
+      register: provisioning_template_results
+
+    - name: "Create the Answer File and link it with the PXE Operating System"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          provisioning_template:
+            name: "{{ answerfile_name }}"
+            template:  "{{ answer_file['content'] }}"
+            snippet: false
+            audit_comment: ""
+            template_kind_id: 5
+            operatingsystem_ids: [ "{{ os_results.actual_record.operatingsystem.id }}"]
+            locked: false
+        state: "{{ state }}"
+      register: answerfile_results
+
+  # ================================================================================
+  # Cross-link the Foreman objects required to PXE boot a host
+  # ================================================================================
+
+    - name: "Link the Operating System with the Partition Table, Provisioning Tamplate, and Answer File"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          operatingsystem:
+            name: "{{ os_name }}"
+            major: "{{ major }}"
+            minor: "{{ minor }}"
+            description: "{{ os_description }}"
+            family: "{{ os_family }}"
+            password_hash: "SHA256"
+            architecture_ids:
+              - "{{ architecture_results.actual_record.architecture.id }}"
+            config_template_ids:
+              - "{{ answerfile_results.actual_record.provisioning_template.id }}"
+            provisioning_template_ids:
+              - "{{ provisioning_template_results.actual_record.provisioning_template.id }}"
+            medium_ids:
+              - "{{ medium_results.actual_record.medium.id }}"
+            ptable_ids:
+              - "{{ ptable_results.actual_record.ptable.id }}"
+        state: "{{ state }}"
+      register: os_results
+
+    - name: "Link the PXE PXELinux Provisioning Template with the Operating System"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          provisioning_template:
+            name: "{{ pxelinux_name }}"
+            template:  "{{ pxelinux_file['content'] }}"
+            snippet: false
+            audit_comment: ""
+            template_kind_id: 1
+            operatingsystem_ids: [ "{{ os_results.actual_record.operatingsystem.id }}"]
+            locked: false
+        state: "{{ state }}"
+      register: provisioning_template_results
+
+    - name: "Link the Answer File with the Operating System"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          provisioning_template:
+            name: "{{ answerfile_name}}"
+            template:  "{{ answer_file['content'] }}"
+            snippet: false
+            audit_comment: ""
+            template_kind_id: 5
+            operatingsystem_ids: [ "{{ os_results.actual_record.operatingsystem.id }}"]
+            locked: false
+        state: "{{ state }}"
+      register: answerfile_link_results
+
+    - name: "Set the default Provisioning Template for the PXE Operating system"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          os_default_template:
+            operatingsystem_id: "{{ os_results.actual_record.operatingsystem.id }}"
+            template_kind_id: 1
+            provisioning_template_id:  "{{ provisioning_template_results.actual_record.provisioning_template.id }}"
+          dependencies:
+            - operatingsystem:
+                id: "{{ os_results.actual_record.operatingsystem.id }}"
+                name: "{{ os_name }}"
+                description: "{{ os_description }}"
+        state: present
+      register: os_link_results
+
+    - name: "Set the default Answer File for the PXE Operating system"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          os_default_template:
+            operatingsystem_id: "{{ os_results.actual_record.operatingsystem.id }}"
+            template_kind_id: 5
+            provisioning_template_id: "{{ answerfile_results.actual_record.provisioning_template.id }}"
+          dependencies:
+            - operatingsystem:
+                id: "{{ os_results.actual_record.operatingsystem.id }}"
+                name: "{{ os_name }}"
+                description: "{{ os_description }}"
+        state: present
+      register: os_link_results
+
+  # ================================================================================
+  # Create the host object
+  # ================================================================================
+
+    - name: "Create the PXE Boot Host"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          host:
+            name: "{{ host_name }}"
+            ip: "{{ host_ip }}"
+            mac: "{{ host_mac }}"
+            architecture_id: "{{ architecture_results.actual_record.architecture.id }}"
+            domain_id: "{{ domain_results.actual_record.domain.id }}"
+            operatingsystem_id: "{{ os_results.actual_record.operatingsystem.id }}"
+            medium_id: "{{ medium_results.actual_record.medium.id }}"
+            pxe_loader: "PXELinux BIOS"
+            subnet_id: "{{ subnet_results.actual_record.subnet.id }}"
+            ptable_id: "{{ ptable_results.actual_record.ptable.id }}"
+            root_pass: "password"
+            build: true
+            provision_method: "build"
+        state: "{{ state }}"
+      register: provisioning_template_results

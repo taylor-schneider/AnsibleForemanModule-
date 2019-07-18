@@ -1,0 +1,110 @@
+#!/usr/bin/python
+
+import xml.dom.minidom
+import os
+import urllib2
+import ssl
+
+# This script will set the disk name in the Answer File
+# It assumes that the answer file has already been downloaded
+# to the default location
+
+# ==============================================
+# Utility Functions
+# ==============================================
+
+def determine_correct_disk_name():
+    return "sda"
+
+def get_primary_disk_name_from_answer_file(xml_dom):
+
+    # Determine if the answerfile specified a <primary-disk> tag
+    #
+    # This holds the name of the storage device where the control domain is installed
+    # For example:
+    #
+    # <primary-disk gueststorage="yes">sda</primary-disk>
+    #
+    # Where /dev/sda is the device I am selecting to install to
+    #
+
+    primary_disks = xml_dom.getElementsByTagName('primary-disk')
+    primary_disk = None
+
+    # If there are too many disks specified (malformed xml) we will throw an exception
+    x = len(primary_disks)
+    if x > 1:
+        raise Exception("There were '{0}' primary-disks specified in the anwerfile but there should only be one.")
+
+    if x == 1:
+        primary_disk = primary_disks[0]
+
+
+    return primary_disk
+
+def set_primary_disk_for_answer_file(xml_dom,  disk_name):
+
+    primary_disks = xml_dom.getElementsByTagName('primary-disk')
+
+    # If we need to modify the existing disk:
+    if len(primary_disks) == 1:
+        primary_disk = primary_disks[0]
+
+        # https://stackoverflow.com/questions/13588072/python-minidom-xml-how-to-set-node-text-with-minidom-api?lq=1
+        primary_disk.firstChild.replaceWholeText(disk_name)
+
+    # If we need to add a new disk entry
+    else:
+        # https://stackoverflow.com/questions/23411791/modify-xml-using-python-minidom
+        primary_disk = xml_dom.createElement('primary-disk')
+        primary_disk.setAttribute('gueststorage', 'yes')
+        xml_dom.appendChild(primary_disk)
+
+def download_answerfile(url):
+
+    # Create a context object to allow us to download files from servers with self signed certs
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    # Download the answerfile
+    result = urllib2.urlopen(url, context=ctx)
+    xml_string = result.read()
+
+    return xml_string
+
+# ==============================================
+# Main
+# ==============================================
+
+# Create the object to log
+LOG_FILE="/tmp/test.log"
+file_handle = open(LOG_FILE, 'w')
+
+# Download the answerfile
+file_handle.write('Downloading XML\n')
+answerfile_url = "<%= foreman_url('provision')%>"
+xml_string = download_answerfile(answerfile_url)
+
+# Load the Answer File's XML into an object
+file_handle.write('Loading XML\n')
+xml_dom = xml.dom.minidom.parseString(xml_string)
+
+# Determine the correct disk_name to use for the installation
+file_handle.write('Determining correct disk name\n')
+new_disk_name = determine_correct_disk_name()
+
+# Determine the current disk_name specified in the installation
+file_handle.write('Determining current disk name\n')
+old_disk_name = get_primary_disk_name_from_answer_file(xml_dom)
+
+# Change the file if needed
+if new_disk_name != old_disk_name:
+    file_handle.write('Updating XML\n')
+    set_primary_disk_for_answer_file(xml_dom, new_disk_name)
+
+# Print XML to output (Ignoring whitespace lines)
+pretty_xml = xml_dom.toprettyxml()
+for line in pretty_xml.split(os.linesep):
+    if line.strip():
+        print(line)
