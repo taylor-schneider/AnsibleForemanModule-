@@ -233,6 +233,50 @@
       register: answerfile_results
 
   # ================================================================================
+  # Delete any provisioning templates associated with the OS
+  #     The API will not let us set them if they already exist
+  # ================================================================================
+
+    - name: "Delete the default Provisioning Template for the PXE Operating system"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          os_default_template:
+            operatingsystem_id: "{{ os_results.actual_record.operatingsystem.id }}"
+            template_kind_id: 1
+            provisioning_template_id:  "{{ provisioning_template_results.actual_record.provisioning_template.id }}"
+          dependencies:
+            - operatingsystem:
+                id: "{{ os_results.actual_record.operatingsystem.id }}"
+                name: "{{ os_name }}"
+                description: "{{ os_description }}"
+        state: absent
+      register: os_link_results
+
+    - name: "Delete the default Answer File for the PXE Operating system"
+      AnsibleForemanModule:
+        username: "{{ username }}"
+        password: "{{ password }}"
+        apiUrl: "{{ apiUrl }}"
+        verifySsl: "{{ verifySsl }}"
+        record:
+          os_default_template:
+            operatingsystem_id: "{{ os_results.actual_record.operatingsystem.id }}"
+            template_kind_id: 5
+            provisioning_template_id: "{{ answerfile_results.actual_record.provisioning_template.id }}"
+          dependencies:
+            - operatingsystem:
+                id: "{{ os_results.actual_record.operatingsystem.id }}"
+                name: "{{ os_name }}"
+                description: "{{ os_description }}"
+        state: absent
+      register: os_link_results
+
+
+  # ================================================================================
   # Cross-link the Foreman objects required to PXE boot a host
   # ================================================================================
 

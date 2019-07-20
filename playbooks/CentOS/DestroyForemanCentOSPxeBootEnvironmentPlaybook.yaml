@@ -2,7 +2,7 @@
   remote_user: root
   vars:
     # Specify whether we want to create things or destroy them
-    state: "present"
+    state: "absent"
 
     # Foreman API Connection parameters
     username : admin
@@ -51,18 +51,18 @@
   # Delete the Host
   # ================================================================================
 
-#  - name: "Destroy the PXE Boot Host"
-#    AnsibleForemanModule:
-#      username: "{{ username }}"
-#      password: "{{ password }}"
-#      apiUrl: "{{ apiUrl }}"
-#      verifySsl: "{{ verifySsl }}"
-#      record:
-#        host:
-#          name: "{{ host_name }}"
-#          mac : "{{ host_mac }}"
-#      state: "{{ state }}"
-#    register: provisioning_template_results
+  - name: "Destroy the PXE Boot Host"
+    AnsibleForemanModule:
+      username: "{{ username }}"
+      password: "{{ password }}"
+      apiUrl: "{{ apiUrl }}"
+      verifySsl: "{{ verifySsl }}"
+      record:
+        host:
+          name: "{{ host_name }}"
+          mac : "{{ host_mac }}"
+      state: "{{ state }}"
+    register: provisioning_template_results
 
   # ================================================================================
   # Un-link the Foreman objects required to PXE boot a host

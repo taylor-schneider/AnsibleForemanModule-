@@ -27,6 +27,7 @@ class Test_CreatePxeBootHost_CentOS(ForemanAnsinbleModuleTestCase):
     def test_CreatePxeBootHost_CentOS_Debug(self):
 
         self.tasksToDebug = "all"
+        #self.tasksToDebug = ["Delete the default Provisioning Template for the PXE Operating system"]
 
         super()._CreatePxeBootHost_Debug()
 
