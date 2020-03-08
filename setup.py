@@ -11,7 +11,6 @@ install_requires = [
     "pyyaml",
     "ansible",
     "yamlordereddictloader",
-    "AnsibleModulePatcher",
     "ForemanApiWrapper"
 ]
 
