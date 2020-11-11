@@ -18,7 +18,7 @@ class Test_AnsibleFormanModule(TestCase):
         super().__init__(*args, **kwargs)
         self.username = "admin"
         self.password = "password"
-        self.apiUrl = "https://15.4.7.1"
+        self.apiUrl = "https://15.4.5.1"
         self.verifySsl = False
         self.api_wrapper = ForemanApiWrapper(self.username, self.password, self.apiUrl, self.verifySsl)
 
@@ -174,4 +174,36 @@ class Test_AnsibleFormanModule(TestCase):
             # Cleanup after the test
              self._run_ansible_forman_module(playbook_record, "absent")
 
+    def test__Adhoc_Playbook(self):
 
+        playbookYaml = """
+- hosts: localhost
+  remote_user: root
+  tasks:
+    - name: This is my task to execute my module
+      AnsibleForemanModule:
+        apiUrl: https://15.4.5.1
+        username: admin
+        password: password
+        verifySsl: false
+        record:
+          operatingsystem:
+            architecture_ids: []
+            config_template_ids: []
+            description: CentOS Operating System
+            family: Redhat
+            major: 7
+            medium_ids: []
+            minor: 8.2003
+            name: CentOS
+            password_hash: SHA256
+            provisioning_template_ids: []
+            ptable_ids: []
+        state: present
+"""
+
+        # Run the module, get the results
+        cleanup = True
+        result = AnsibleUtility.test_playbook(playbookYaml, [self.taskName], cleanup, [self.modulePath])
+
+        return result
