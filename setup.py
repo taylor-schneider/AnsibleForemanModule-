@@ -9,7 +9,6 @@ with open('README.md', "r") as fh:
 # Specify the names of the pip packages which are required for this package to work
 install_requires = [
     "pyyaml",
-    "ansible",
     "yamlordereddictloader",
     "ForemanApiWrapper"
 ]
