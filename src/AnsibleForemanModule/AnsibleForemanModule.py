@@ -117,7 +117,11 @@ def run_module():
         if module:
             module.fail_json(msg=error_msg, **result)
         else:
-            raise Exception(error_msg) from e
+            if PY3:
+                raise Exception(error_msg) from e
+            else:
+                from future.utils import raise_from
+                raise_from(Exception(error_msg), e)
 
 def main():
     run_module()
