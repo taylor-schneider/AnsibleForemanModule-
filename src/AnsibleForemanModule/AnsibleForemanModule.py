@@ -23,6 +23,7 @@ RETURN = '''
 import os
 import sys
 import logging
+from io import StringIO
 from ansible.module_utils.basic import AnsibleModule
 from ForemanApiWrapper.ForemanApiUtilities.ForemanApiWrapper import ForemanApiWrapper
 from ForemanApiWrapper.ApiStateEnforcer.ApiStateEnforcer import ApiStateEnforcer
@@ -34,12 +35,18 @@ PY3 = sys.version_info >= (3, 0)
 # Configure logging format and level
 logFormat = '%(asctime)s,%(msecs)d %(levelname)-8s [%(module)s:%(funcName)s():%(lineno)d] %(message)s'
 
-logging.basicConfig(format=logFormat,
+logging.basicConfig(
+    format=logFormat,
     datefmt='%Y-%m-%d:%H:%M:%S',
     level=logging.DEBUG)
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
+
+# Setup logging so it can be stored in a variable and returned to ansbile control node
+log_stream = StringIO()
+handler = logging.StreamHandler(log_stream)
+logger.addHandler(handler)
 
 # Configure the logging framework to log to console
 #logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -102,6 +109,11 @@ def run_module():
         modification_receipt = api_state_enforcer.ensure_state(desired_state, record)
 
         result.update(modification_receipt.__dict__)
+
+        # Get the logs
+        logs = log_stream.getvalue()
+        logs = logs.split(os.linesep)
+        result.update({"logs": logs})
 
         # In the event of a successful module execution, you will want to
         # simple AnsibleModule.exit_json(), passing the key/value results
