@@ -33,7 +33,7 @@ from ForemanApiWrapper.ApiStateEnforcer.ApiStateEnforcer import ApiStateEnforcer
 PY3 = sys.version_info >= (3, 0)
 
 # Configure logging format and level
-logFormat = '%(asctime)s,%(msecs)d %(levelname)-8s [%(module)s:%(funcName)s():%(lineno)d] %(message)s'
+log_format = '%(asctime)s,%(msecs)d %(levelname)-8s [%(module)s:%(funcName)s():%(lineno)d] %(message)s'
 
 logging.basicConfig(
     format=logFormat,
@@ -46,6 +46,7 @@ logger.setLevel(logging.DEBUG)
 # Setup logging so it can be stored in a variable and returned to ansbile control node
 log_stream = StringIO()
 handler = logging.StreamHandler(log_stream)
+handler.setFormatter(logging.Formatterlog_format))
 logger.addHandler(handler)
 
 # Configure the logging framework to log to console
@@ -97,6 +98,7 @@ def run_module():
                 # Configure the logger
                 fh = logging.FileHandler(log_path)
                 fh.setLevel(logging.DEBUG)
+                fh.setFormatter(logging.Formatterlog_format))
                 logger.addHandler(fh)
         except Exception as e:
             # logging is best effort

@@ -202,6 +202,22 @@ class Test_AnsibleFormanModule(TestCase):
         state: present
 """
 
+        playbookYaml = """
+        - hosts: localhost
+          remote_user: root
+          tasks:
+            - name: This is my task to execute my module
+              AnsibleForemanModule:
+                apiUrl: https://15.4.5.1
+                username: admin
+                password: password
+                verifySsl: false
+                record:
+                  host:
+                    id: 3
+                state: absent
+        """
+
         # Run the module, get the results
         cleanup = True
         result = AnsibleUtility.test_playbook(playbookYaml, [self.taskName], cleanup, [self.modulePath])
