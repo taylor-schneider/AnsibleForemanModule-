@@ -1,4 +1,5 @@
 # Ansible Foreman Module
+This repository contains an ansible module which wraps around the ForemanApiWrapper library. It allows users to manage Foreman using ansible.
 
 ## OS Package Dependencies
 Outside the python dependencies there are OS dependencies that need to be installed
