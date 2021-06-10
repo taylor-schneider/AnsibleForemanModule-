@@ -45,9 +45,9 @@ This is important to consider because it affects the AnsibleUtility's ability to
 #### Affected Versions
 I have only tested this library on a limited number of installations. AFAIK the following are affected:
 
-| OS       | Version  |
-|----------|-------------|
-|CentOS|2.7.8        |
+| OS       | Ansible Version  |
+|----------|-------------     |
+|CentOS    |2.7.8             |
 
 If you try to debug a module or run a module which gathers facts, you may see the following output from ansible.
 
